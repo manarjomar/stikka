@@ -25,6 +25,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.Brush
+import androidx.compose.material.icons.rounded.EmojiEmotions
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.CloudDownload
@@ -77,6 +78,7 @@ fun CutoutScreen(
     onWholeImage: () -> Unit,
     onPickAnother: () -> Unit,
     onEdit: () -> Unit,
+    onDecorate: () -> Unit,
 ) {
     Scaffold(
         topBar = {
@@ -106,7 +108,7 @@ fun CutoutScreen(
             ) { s ->
                 when (s) {
                     is CutState.Working -> WorkingView(s)
-                    is CutState.Ready -> ReadyView(s, saving, onSave, onWholeImage, onEdit)
+                    is CutState.Ready -> ReadyView(s, saving, onSave, onWholeImage, onEdit, onDecorate)
                     is CutState.NoSubject -> ProblemView(
                         icon = Icons.Rounded.SearchOff,
                         title = tr("No encuentro a nadie", "Nothing to cut out"),
@@ -197,7 +199,7 @@ private fun WorkingView(s: CutState.Working) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun ReadyView(s: CutState.Ready, saving: Boolean, onSave: () -> Unit, onWholeImage: () -> Unit, onEdit: () -> Unit) {
+private fun ReadyView(s: CutState.Ready, saving: Boolean, onSave: () -> Unit, onWholeImage: () -> Unit, onEdit: () -> Unit, onDecorate: () -> Unit) {
     var showOriginal by remember { mutableStateOf(false) }
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Spacer(Modifier.height(8.dp))
@@ -251,11 +253,24 @@ private fun ReadyView(s: CutState.Ready, saving: Boolean, onSave: () -> Unit, on
             }
         }
         Spacer(Modifier.height(20.dp))
-        FilledTonalButton(onClick = onEdit, enabled = !saving, modifier = Modifier.fillMaxWidth().height(52.dp)) {
-            Icon(Icons.Rounded.Brush, null)
-            Spacer(Modifier.width(10.dp))
-            Text(tr("Retocar: pincel, lazo o cuadrado", "Fine-tune: brush, lasso or square"))
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+            FilledTonalButton(onClick = onEdit, enabled = !saving, modifier = Modifier.weight(1f).height(56.dp)) {
+                Icon(Icons.Rounded.Brush, null, Modifier.size(20.dp))
+                Spacer(Modifier.width(8.dp))
+                Text(tr("Recorte", "Cutout"))
+            }
+            FilledTonalButton(onClick = onDecorate, enabled = !saving, modifier = Modifier.weight(1f).height(56.dp)) {
+                Icon(Icons.Rounded.EmojiEmotions, null, Modifier.size(20.dp))
+                Spacer(Modifier.width(8.dp))
+                Text(tr("Decorar", "Decorate"))
+            }
         }
+        Text(
+            tr("Pincel, lazo o cuadrado · textos, emojis y borde", "Brush, lasso or square · text, emojis and outline"),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = 6.dp),
+        )
         Spacer(Modifier.height(10.dp))
         Button(
             onClick = onSave,

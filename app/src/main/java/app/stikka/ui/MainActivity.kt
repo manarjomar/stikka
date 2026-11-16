@@ -117,7 +117,9 @@ class MainActivity : ComponentActivity() {
         val cut = vm.cut
         val viewing = vm.viewing
         val editor = vm.editor
+        val decorator = vm.decorator
         val screen = when {
+            decorator != null -> "decor"
             editor != null -> "edit"
             cut != null -> "cut"
             viewing != null -> "view"
@@ -126,6 +128,7 @@ class MainActivity : ComponentActivity() {
 
         BackHandler(enabled = screen != "home") {
             when {
+                decorator != null -> vm.closeDecorator()
                 editor != null -> vm.closeEditor()
                 cut != null -> vm.closeCut()
                 else -> vm.closeViewer()
@@ -138,6 +141,14 @@ class MainActivity : ComponentActivity() {
             label = "screen",
         ) { target ->
             when (target) {
+                "decor" -> vm.decorator?.let { d ->
+                    DecorScreen(
+                        editor = d,
+                        saving = vm.saving,
+                        onClose = vm::closeDecorator,
+                        onDone = vm::finishDecorator,
+                    )
+                }
                 "edit" -> vm.editor?.let { e ->
                     MaskEditorScreen(
                         editor = e,
@@ -155,6 +166,7 @@ class MainActivity : ComponentActivity() {
                         onWholeImage = vm::useWholeImage,
                         onPickAnother = openGallery,
                         onEdit = vm::editCut,
+                        onDecorate = vm::decorateCut,
                     )
                 }
                 "view" -> vm.viewing?.let { sticker ->
@@ -164,6 +176,7 @@ class MainActivity : ComponentActivity() {
                         onShare = ::share,
                         onDelete = vm::delete,
                         onEdit = vm::editSticker,
+                        onDecorate = vm::decorateSticker,
                     )
                 }
                 else -> HomeScreen(

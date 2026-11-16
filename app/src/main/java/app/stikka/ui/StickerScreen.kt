@@ -18,6 +18,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Brush
+import androidx.compose.material.icons.rounded.EmojiEmotions
 import androidx.compose.material.icons.rounded.CalendarToday
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.PhotoSizeSelectActual
@@ -62,6 +63,7 @@ fun StickerScreen(
     onShare: (Sticker) -> Unit,
     onDelete: (Sticker) -> Unit,
     onEdit: (Sticker) -> Unit,
+    onDecorate: (Sticker) -> Unit,
 ) {
     var confirm by remember { mutableStateOf(false) }
 
@@ -129,12 +131,19 @@ fun StickerScreen(
                 Spacer(Modifier.width(10.dp))
                 Text(tr("Compartir", "Share"), style = MaterialTheme.typography.titleMedium)
             }
-            if (sticker.editable) {
-                Spacer(Modifier.height(10.dp))
-                FilledTonalButton(onClick = { onEdit(sticker) }, modifier = Modifier.fillMaxWidth().height(52.dp)) {
-                    Icon(Icons.Rounded.Brush, null)
-                    Spacer(Modifier.width(10.dp))
-                    Text(tr("Retocar recorte", "Fine-tune cutout"))
+            Spacer(Modifier.height(10.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+                if (sticker.editable) {
+                    FilledTonalButton(onClick = { onEdit(sticker) }, modifier = Modifier.weight(1f).height(52.dp)) {
+                        Icon(Icons.Rounded.Brush, null, Modifier.size(20.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text(tr("Recorte", "Cutout"))
+                    }
+                }
+                FilledTonalButton(onClick = { onDecorate(sticker) }, modifier = Modifier.weight(1f).height(52.dp)) {
+                    Icon(Icons.Rounded.EmojiEmotions, null, Modifier.size(20.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text(tr("Decorar", "Decorate"))
                 }
             }
             Spacer(Modifier.height(10.dp))
@@ -146,8 +155,8 @@ fun StickerScreen(
             Spacer(Modifier.height(16.dp))
             Text(
                 tr(
-                    "Próximamente: textos, emojis y paquetes para añadir a WhatsApp.",
-                    "Coming soon: text, emojis and packs to add to WhatsApp.",
+                    "Próximamente: paquetes para añadir a WhatsApp e importar tus stickers de WhatsApp.",
+                    "Coming soon: packs to add to WhatsApp and importing your WhatsApp stickers.",
                 ),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,

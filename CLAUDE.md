@@ -6,5 +6,5 @@
 - Versionado: sube `version.txt` (0.1 → 0.2…) y reescribe `release-notes.md` (bilingüe) cuando haya cambios para el usuario; así se publica una release nueva. Cambios internos sin release: no toques `version.txt`.
 - Todo bilingüe: textos de la interfaz con `tr("español", "english")`; README y notas de versión en inglés y español.
 - El repo es público: la firma vive solo en los secretos `KEYSTORE_BASE64` y `SIGNING_PASSWORD` (alias `stikka`). Nunca subas el `.jks` ni la contraseña. Si cambian, las actualizaciones no se instalan encima.
-- Recorte: ML Kit Subject Segmentation (modelo de Google Play Services, en el dispositivo). Cada sticker guarda `source.jpg`, `mask.png` y `sticker.webp` en `filesDir/stickers/<id>/`, para poder retocar la máscara después.
+- Recorte: ML Kit Subject Segmentation (modelo de Google Play Services, en el dispositivo). Cada sticker vive en `filesDir/stickers/<id>/`: `sticker.webp` (final), `base.png` (recorte sin decorar), `decor.json` (borde, textos, emojis), `source.jpg` y `mask.png` (para retocar el recorte).
 - Hoja de ruta: 0.2 editor de recorte (pincel, lazo, rectángulo/cuadrado, zoom, lupa, deshacer) · 0.3 textos y emojis editables, borde blanco · 0.4 paquetes, «Añadir a WhatsApp» e importar desde WhatsApp · 1.0 pulido · después, animados.

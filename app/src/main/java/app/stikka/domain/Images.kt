@@ -98,6 +98,9 @@ object Images {
         return bytes
     }
 
+    fun encodePng(bitmap: Bitmap): ByteArray =
+        ByteArrayOutputStream().also { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }.toByteArray()
+
     fun encodeJpeg(bitmap: Bitmap, quality: Int = 90): ByteArray =
         ByteArrayOutputStream().also { bitmap.compress(Bitmap.CompressFormat.JPEG, quality, it) }.toByteArray()
 
