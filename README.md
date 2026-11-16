@@ -19,7 +19,7 @@
 
 ### What it does
 - **Smart cutout** – picks out the person, pet or object automatically (Google ML Kit, runs on your phone).
-- **Any source** – gallery, camera, or *Share → Stikka* from any app.
+- **Any source** – gallery, camera, or *Share → Stikka* from any app. **Animated stickers** from videos and GIFs.
 - **WhatsApp-ready** – 512 × 512 px transparent WebP under 100 KB.
 - **Your library** – keep, share and delete your stickers.
 - **Packs for WhatsApp** – one tap to add them; changes update automatically. Import stickers from your chats.
@@ -36,7 +36,7 @@
 | **0.4** | Sticker packs + **Add to WhatsApp** + import from WhatsApp ✅ |
 | **0.5** | Settings & About, update checker, backup, share packs, filters, reorder, duplicate, rotate/mirror, shadow, bubbles, multiple subjects ✅ |
 | 1.0 | Polish |
-| Later | Animated stickers from GIF/video |
+| **0.6** | Animated stickers from video or GIF (clip, fps, framing, background removal, decoration) ✅ |
 
 ### Install
 Download `Stikka-X.Y.apk` from [Releases](https://github.com/manarjomar/stikka/releases/latest) and open it on your phone. Requires Android 10+ and Google Play Services (the cutout model is downloaded once, the first time).
@@ -47,7 +47,7 @@ Download `Stikka-X.Y.apk` from [Releases](https://github.com/manarjomar/stikka/r
 
 ### Qué hace
 - **Recorte inteligente** – detecta y recorta solo a la persona, mascota u objeto (Google ML Kit, en tu móvil).
-- **Desde cualquier sitio** – galería, cámara o *Compartir → Stikka* desde cualquier app.
+- **Desde cualquier sitio** – galería, cámara o *Compartir → Stikka* desde cualquier app. **Stickers animados** desde vídeos y GIF.
 - **Listo para WhatsApp** – WebP transparente de 512 × 512 px y menos de 100 KB.
 - **Tu biblioteca** – guarda, comparte y elimina tus stickers.
 - **Paquetes para WhatsApp** – se añaden con un toque y los cambios se actualizan solos. Importa los stickers de tus chats.
@@ -64,7 +64,7 @@ Download `Stikka-X.Y.apk` from [Releases](https://github.com/manarjomar/stikka/r
 | **0.4** | Paquetes + **Añadir a WhatsApp** + importar desde WhatsApp ✅ |
 | **0.5** | Ajustes y Acerca de, actualizaciones, copia de seguridad, compartir paquetes, filtros, ordenar, duplicar, girar/voltear, sombra, bocadillos, varios sujetos ✅ |
 | 1.0 | Pulido |
-| Después | Stickers animados desde GIF o vídeo |
+| **0.6** | Stickers animados desde vídeo o GIF (tramo, fps, encuadre, quitar fondo, decoración) ✅ |
 
 ### Instalar
 Descarga `Stikka-X.Y.apk` desde [Releases](https://github.com/manarjomar/stikka/releases/latest) y ábrelo en el móvil. Requiere Android 10 o posterior y Google Play Services (el modelo de recorte se descarga una vez, la primera vez).

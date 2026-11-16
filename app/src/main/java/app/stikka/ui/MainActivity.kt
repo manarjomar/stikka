@@ -77,9 +77,12 @@ class MainActivity : ComponentActivity() {
     /** Imagen compartida desde otra app: directa al recorte. */
     private fun handleIntent(intent: Intent?) {
         if (intent?.action != Intent.ACTION_SEND) return
-        if (intent.type?.startsWith("image/") != true) return
+        val type = intent.type.orEmpty()
         val uri = IntentCompat.getParcelableExtra(intent, Intent.EXTRA_STREAM, Uri::class.java) ?: return
-        vm.startCutout(uri)
+        when {
+            type == "image/gif" || type.startsWith("video/") -> vm.startAnimated(uri)
+            type.startsWith("image/") -> vm.startCutout(uri)
+        }
     }
 
     private fun share(sticker: Sticker) {
@@ -114,6 +117,12 @@ class MainActivity : ComponentActivity() {
         }
         val openGallery = {
             pickPhoto.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+        }
+        val pickVideo = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+            if (uri != null) vm.startAnimated(uri)
+        }
+        val pickGif = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+            if (uri != null) vm.startAnimated(uri)
         }
         val pickFolder = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
             if (uri != null) vm.chooseImportFolder(uri)
@@ -183,6 +192,7 @@ class MainActivity : ComponentActivity() {
             decorator != null -> "decor"
             editor != null -> "edit"
             cut != null -> "cut"
+            vm.anim != null -> "anim"
             viewing != null -> "view"
             vm.importOpen -> "import"
             vm.settingsOpen -> "settings"
@@ -197,6 +207,7 @@ class MainActivity : ComponentActivity() {
                 decorator != null -> vm.closeDecorator()
                 editor != null -> vm.closeEditor()
                 cut != null -> vm.closeCut()
+                vm.anim != null -> vm.closeAnim()
                 viewing != null -> vm.closeViewer()
                 vm.importOpen -> vm.closeImport()
                 vm.settingsOpen -> vm.settingsOpen = false
@@ -265,6 +276,7 @@ class MainActivity : ComponentActivity() {
                         onDuplicate = { vm.duplicate(sticker) },
                     )
                 }
+                "anim" -> vm.anim?.let { AnimatedScreen(vm, it) }
                 "onboarding" -> OnboardingScreen(onDone = vm.settings::finishOnboarding)
                 "settings" -> SettingsScreen(
                     vm,
@@ -282,6 +294,8 @@ class MainActivity : ComponentActivity() {
                     snackbar = snackbar,
                     onGallery = openGallery,
                     onCamera = openCamera,
+                    onVideo = { pickVideo.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.VideoOnly)) },
+                    onGif = { pickGif.launch(arrayOf("image/gif")) },
                 )
             }
         }

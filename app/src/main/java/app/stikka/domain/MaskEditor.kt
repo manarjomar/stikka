@@ -31,6 +31,8 @@ enum class ShapeOp {
 sealed interface EditTarget {
     data object NewCut : EditTarget
     data class Saved(val stickerId: String) : EditTarget
+    /** El sticker animado que se está creando. */
+    data object Animated : EditTarget
 }
 
 /**

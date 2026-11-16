@@ -42,6 +42,8 @@ import androidx.compose.material.icons.rounded.Inventory2
 import androidx.compose.material.icons.rounded.IosShare
 import androidx.compose.material.icons.rounded.PhotoCamera
 import androidx.compose.material.icons.rounded.PhotoLibrary
+import androidx.compose.material.icons.rounded.Movie
+import androidx.compose.material.icons.rounded.Gif
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material3.AlertDialog
@@ -99,8 +101,11 @@ fun HomeScreen(
     snackbar: SnackbarHostState,
     onGallery: () -> Unit,
     onCamera: () -> Unit,
+    onVideo: () -> Unit,
+    onGif: () -> Unit,
 ) {
     val selecting = vm.selection.isNotEmpty()
+    var animSheet by remember { mutableStateOf(false) }
     var packSheet by remember { mutableStateOf(false) }
     var newPackFor by remember { mutableStateOf<Set<String>?>(null) }
     var confirmDelete by remember { mutableStateOf(false) }
@@ -165,9 +170,35 @@ fun HomeScreen(
         },
     ) { padding ->
         if (vm.tab == 0) {
-            StickersTab(vm, stickers, packs, padding, grid, onGallery, onCamera)
+            StickersTab(vm, stickers, packs, padding, grid, onGallery, onCamera, onAnimated = { animSheet = true })
         } else {
             PacksTab(vm, packs, padding)
+        }
+    }
+
+    if (animSheet) {
+        ModalBottomSheet(onDismissRequest = { animSheet = false }) {
+            Column(Modifier.padding(bottom = 24.dp)) {
+                Text(
+                    tr("Sticker animado desde…", "Animated sticker from…"),
+                    style = MaterialTheme.typography.titleLarge,
+                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
+                )
+                ListItem(
+                    headlineContent = { Text(tr("Un vídeo", "A video")) },
+                    supportingContent = { Text(tr("De la galería; eliges el tramo", "From your gallery; you pick the clip")) },
+                    leadingContent = { BrandBadge(Icons.Rounded.Movie, size = 40.dp, iconSize = 22.dp) },
+                    modifier = Modifier.clickable { animSheet = false; onVideo() },
+                    colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                )
+                ListItem(
+                    headlineContent = { Text(tr("Un GIF", "A GIF")) },
+                    supportingContent = { Text(tr("Un archivo .gif guardado en el móvil", "A .gif file saved on your phone")) },
+                    leadingContent = { BrandBadge(Icons.Rounded.Gif, size = 40.dp, iconSize = 26.dp) },
+                    modifier = Modifier.clickable { animSheet = false; onGif() },
+                    colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                )
+            }
         }
     }
 
@@ -217,6 +248,7 @@ private fun StickersTab(
     grid: LazyGridState,
     onGallery: () -> Unit,
     onCamera: () -> Unit,
+    onAnimated: () -> Unit,
 ) {
     LazyVerticalGrid(
         state = grid,
@@ -232,6 +264,31 @@ private fun StickersTab(
         modifier = Modifier.fillMaxSize(),
     ) {
         item(span = { GridItemSpan(maxLineSpan) }) { Hero(onGallery, onCamera, onSettings = { vm.settingsOpen = true }) }
+        item(span = { GridItemSpan(maxLineSpan) }) {
+            Surface(
+                onClick = onAnimated,
+                shape = MaterialTheme.shapes.medium,
+                color = MaterialTheme.colorScheme.secondaryContainer,
+            ) {
+                Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Rounded.Movie, null, tint = MaterialTheme.colorScheme.onSecondaryContainer)
+                    Spacer(Modifier.width(12.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            tr("Sticker animado", "Animated sticker"),
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer,
+                        )
+                        Text(
+                            tr("A partir de un vídeo o un GIF, con o sin fondo", "From a video or a GIF, with or without background"),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.85f),
+                        )
+                    }
+                    AnimatedBadge()
+                }
+            }
+        }
         item(span = { GridItemSpan(maxLineSpan) }) {
             Surface(
                 onClick = vm::openImport,

@@ -110,6 +110,17 @@ object Images {
         return bytes
     }
 
+    /** WebP con pérdida a una calidad concreta (para los fotogramas de un animado). */
+    fun encodeWebpQuality(bitmap: Bitmap, quality: Int): ByteArray {
+        val format = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            Bitmap.CompressFormat.WEBP_LOSSY
+        } else {
+            @Suppress("DEPRECATION")
+            Bitmap.CompressFormat.WEBP
+        }
+        return ByteArrayOutputStream().also { bitmap.compress(format, quality, it) }.toByteArray()
+    }
+
     fun encodePng(bitmap: Bitmap): ByteArray =
         ByteArrayOutputStream().also { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }.toByteArray()
 

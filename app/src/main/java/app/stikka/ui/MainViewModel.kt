@@ -41,6 +41,28 @@ import kotlinx.coroutines.withContext
 
 enum class Stage { LOADING, DOWNLOADING_MODEL, CUTTING }
 
+/** Sticker animado en preparación (desde un vídeo o un GIF). */
+class AnimSession(val source: app.stikka.domain.AnimSource) {
+    var startMs by mutableStateOf(0L)
+    var endMs by mutableStateOf(minOf(source.durationMs, 3000L))
+    var fps by mutableStateOf(10)
+    var square by mutableStateOf(false)
+    var removeBg by mutableStateOf(false)
+    var decor by mutableStateOf(Decor())
+    /** Fotogramas colocados en 512 px (sin fondo si se pidió). */
+    var frames by mutableStateOf<List<Bitmap>>(emptyList())
+    /** Fotogramas finales con la decoración. */
+    var finals by mutableStateOf<List<Bitmap>>(emptyList())
+    /** Qué se está haciendo ahora (null = nada). */
+    var working by mutableStateOf<String?>(null)
+    var progress by mutableStateOf(0f)
+    /** Los ajustes han cambiado desde la última vista previa. */
+    var dirty by mutableStateOf(true)
+
+    val frameMs get() = 1000 / fps
+    val frameCount get() = app.stikka.domain.AnimFrames.times(startMs, endMs, fps).size
+}
+
 /** Estado de la pantalla de recorte. */
 sealed interface CutState {
     data class Working(val stage: Stage, val original: Bitmap? = null) : CutState
@@ -204,6 +226,9 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     private var job: Job? = null
 
+    var anim by mutableStateOf<AnimSession?>(null)
+        private set
+
     init {
         viewModelScope.launch {
             withContext(Dispatchers.IO) { fixStaticMarkedAsAnimated() }
@@ -211,6 +236,103 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             // Comprobación automática de versiones nuevas, como mucho una vez al día.
             if (settings.autoUpdateCheck && System.currentTimeMillis() - settings.lastUpdateCheck > 24 * 3600 * 1000L) {
                 checkUpdates(manual = false)
+            }
+        }
+    }
+
+    // ---------- Sticker animado (vídeo o GIF) ----------
+
+    fun startAnimated(uri: Uri) {
+        job?.cancel()
+        viewing = null
+        cut = null
+        viewModelScope.launch {
+            val src = withContext(Dispatchers.IO) { runCatching { app.stikka.domain.AnimFrames.open(getApplication(), uri) }.getOrNull() }
+            if (src == null) {
+                message = tr("No se puede leer ese vídeo o GIF", "That video or GIF can't be read")
+                return@launch
+            }
+            anim = AnimSession(src)
+            generateAnim()
+        }
+    }
+
+    /** Saca los fotogramas con los ajustes actuales y prepara la vista previa. */
+    fun generateAnim() {
+        val a = anim ?: return
+        job?.cancel()
+        job = viewModelScope.launch {
+            val ctx: Context = getApplication()
+            try {
+                a.working = tr("Sacando fotogramas…", "Extracting frames…")
+                a.progress = 0f
+                val times = app.stikka.domain.AnimFrames.times(a.startMs, a.endMs, a.fps)
+                var frames = withContext(Dispatchers.IO) {
+                    app.stikka.domain.AnimFrames.extract(ctx, a.source, times, a.square) { p -> a.progress = p }
+                }
+                if (frames.isEmpty()) throw IllegalStateException("no frames")
+                if (a.removeBg) {
+                    a.working = tr("Quitando el fondo…", "Removing the background…")
+                    a.progress = 0f
+                    Cutout.ensureModel(ctx) { a.working = tr("Preparando el recorte inteligente…", "Getting smart cutout ready…") }
+                    a.working = tr("Quitando el fondo…", "Removing the background…")
+                    val done = ArrayList<Bitmap>(frames.size)
+                    frames.forEachIndexed { i, f ->
+                        done += app.stikka.domain.AnimFrames.removeBackground(f)
+                        a.progress = (i + 1f) / frames.size
+                    }
+                    frames = done
+                }
+                a.frames = frames
+                renderAnimFinals(a)
+                a.dirty = false
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Throwable) {
+                message = tr("No se han podido sacar los fotogramas", "Couldn't extract the frames")
+            } finally {
+                a.working = null
+            }
+        }
+    }
+
+    private suspend fun renderAnimFinals(a: AnimSession) {
+        a.working = tr("Aplicando la decoración…", "Applying decoration…")
+        a.finals = withContext(Dispatchers.Default) { a.frames.map { DecorRenderer.render(it, a.decor) } }
+    }
+
+    fun decorateAnim() {
+        val a = anim ?: return
+        val first = a.frames.firstOrNull() ?: return
+        decorator = DecorEditor(first, a.decor, EditTarget.Animated)
+    }
+
+    fun closeAnim() {
+        job?.cancel()
+        anim = null
+    }
+
+    fun saveAnim() {
+        val a = anim ?: return
+        if (saving || a.finals.isEmpty()) return
+        saving = true
+        viewModelScope.launch {
+            try {
+                a.working = tr("Creando el sticker animado…", "Creating the animated sticker…")
+                val bytes = withContext(Dispatchers.Default) {
+                    app.stikka.domain.AnimFrames.encode(a.finals, a.frameMs) { p -> a.progress = p }
+                }
+                val saved = withContext(Dispatchers.IO) {
+                    store.save(bytes, null, a.decor.toJson(), meta = StickerMeta(animated = true))
+                }
+                anim = null
+                refresh()
+                justSaved = saved.id
+            } catch (e: Throwable) {
+                message = tr("No se ha podido crear el sticker animado", "Couldn't create the animated sticker")
+            } finally {
+                a.working = null
+                saving = false
             }
         }
     }
@@ -356,6 +478,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         if (saving) return
         val mask = e.maskFloats()
         when (val t = e.target) {
+            EditTarget.Animated -> editor = null
             EditTarget.NewCut -> viewModelScope.launch {
                 val decor = (cut as? CutState.Ready)?.decor ?: Decor()
                 cut = build(e.source, mask, autoCut = true, decor = decor)
@@ -407,6 +530,13 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         if (saving) return
         val decor = d.decor
         when (val t = d.target) {
+            EditTarget.Animated -> viewModelScope.launch {
+                anim?.let { a ->
+                    a.decor = decor
+                    decorator = null
+                    try { renderAnimFinals(a) } finally { a.working = null }
+                } ?: run { decorator = null }
+            }
             EditTarget.NewCut -> viewModelScope.launch {
                 val ready = cut as? CutState.Ready
                 if (ready != null) {
