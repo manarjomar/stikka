@@ -111,7 +111,7 @@ class MainActivity : ComponentActivity() {
             pickPhoto.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
         }
         val pickFolder = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
-            if (uri != null) vm.setImportTree(uri)
+            if (uri != null) vm.chooseImportFolder(uri)
         }
         val openFolderPicker = { pickFolder.launch(WhatsAppImport.initialUri()) }
         val addPack = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { res ->

@@ -554,7 +554,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         importSelected = emptySet()
     }
 
-    fun setImportTree(uri: Uri) {
+    fun chooseImportFolder(uri: Uri) {
         val ctx: Context = getApplication()
         runCatching {
             ctx.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
