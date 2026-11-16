@@ -19,6 +19,8 @@ data class Layer(
     val color: Int = 0xFFFFFFFF.toInt(),
     val font: LayerFont = LayerFont.BOLD,
     val stroke: Boolean = true,
+    /** Texto dentro de un bocadillo de color. */
+    val bubble: Boolean = false,
 ) {
     fun toJson(): JSONObject = JSONObject()
         .put("id", id)
@@ -31,6 +33,7 @@ data class Layer(
         .put("color", color)
         .put("font", font.name)
         .put("stroke", stroke)
+        .put("bubble", bubble)
 
     companion object {
         fun fromJson(o: JSONObject) = Layer(
@@ -44,6 +47,7 @@ data class Layer(
             color = o.optInt("color", 0xFFFFFFFF.toInt()),
             font = runCatching { LayerFont.valueOf(o.getString("font")) }.getOrDefault(LayerFont.BOLD),
             stroke = o.optBoolean("stroke", true),
+            bubble = o.optBoolean("bubble", false),
         )
     }
 }
@@ -54,14 +58,29 @@ data class Decor(
     val outlineColor: Int = 0xFFFFFFFF.toInt(),
     val outlineWidth: Float = 10f,
     val layers: List<Layer> = emptyList(),
+    /** Giro del recorte en pasos de 90°. */
+    val baseRotation: Int = 0,
+    /** Recorte volteado en horizontal (efecto espejo). */
+    val baseFlip: Boolean = false,
+    /** Tamaño del recorte dentro del sticker (0.5–1). */
+    val baseScale: Float = 1f,
+    /** Sombra suave bajo el recorte. */
+    val shadow: Boolean = false,
 ) {
-    val isEmpty get() = !outline && layers.isEmpty()
+    val isEmpty get() = !outline && !shadow && layers.isEmpty() && baseRotation == 0 && !baseFlip && baseScale == 1f
+
+    /** Lo que afecta al recorte (sin las capas): sirve de clave para no recalcularlo. */
+    val baseKey get() = copy(layers = emptyList())
 
     fun toJson(): String = JSONObject()
         .put("outline", outline)
         .put("outlineColor", outlineColor)
         .put("outlineWidth", outlineWidth.toDouble())
         .put("layers", JSONArray().apply { layers.forEach { put(it.toJson()) } })
+        .put("baseRotation", baseRotation)
+        .put("baseFlip", baseFlip)
+        .put("baseScale", baseScale.toDouble())
+        .put("shadow", shadow)
         .toString()
 
     companion object {
@@ -75,6 +94,10 @@ data class Decor(
                     outlineColor = o.optInt("outlineColor", 0xFFFFFFFF.toInt()),
                     outlineWidth = o.optDouble("outlineWidth", 10.0).toFloat(),
                     layers = (0 until arr.length()).map { Layer.fromJson(arr.getJSONObject(it)) },
+                    baseRotation = o.optInt("baseRotation", 0),
+                    baseFlip = o.optBoolean("baseFlip", false),
+                    baseScale = o.optDouble("baseScale", 1.0).toFloat(),
+                    shadow = o.optBoolean("shadow", false),
                 )
             }.getOrDefault(Decor())
         }

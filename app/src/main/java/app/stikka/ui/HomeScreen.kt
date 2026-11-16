@@ -42,6 +42,8 @@ import androidx.compose.material.icons.rounded.Inventory2
 import androidx.compose.material.icons.rounded.IosShare
 import androidx.compose.material.icons.rounded.PhotoCamera
 import androidx.compose.material.icons.rounded.PhotoLibrary
+import androidx.compose.material.icons.rounded.Search
+import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -50,6 +52,9 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.FilterChip
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
@@ -160,7 +165,7 @@ fun HomeScreen(
         },
     ) { padding ->
         if (vm.tab == 0) {
-            StickersTab(vm, stickers, padding, grid, onGallery, onCamera)
+            StickersTab(vm, stickers, packs, padding, grid, onGallery, onCamera)
         } else {
             PacksTab(vm, packs, padding)
         }
@@ -207,6 +212,7 @@ fun HomeScreen(
 private fun StickersTab(
     vm: MainViewModel,
     stickers: List<Sticker>,
+    packs: List<Pack>,
     padding: PaddingValues,
     grid: LazyGridState,
     onGallery: () -> Unit,
@@ -225,7 +231,7 @@ private fun StickersTab(
         verticalArrangement = Arrangement.spacedBy(12.dp),
         modifier = Modifier.fillMaxSize(),
     ) {
-        item(span = { GridItemSpan(maxLineSpan) }) { Hero(onGallery, onCamera) }
+        item(span = { GridItemSpan(maxLineSpan) }) { Hero(onGallery, onCamera, onSettings = { vm.settingsOpen = true }) }
         item(span = { GridItemSpan(maxLineSpan) }) {
             Surface(
                 onClick = vm::openImport,
@@ -250,6 +256,7 @@ private fun StickersTab(
                 }
             }
         }
+        val visible = vm.visible(stickers, packs)
         if (stickers.isEmpty()) {
             item(span = { GridItemSpan(maxLineSpan) }) { EmptyState() }
         } else {
@@ -266,7 +273,37 @@ private fun StickersTab(
                     )
                 }
             }
-            items(stickers, key = { it.id }) { sticker ->
+            item(span = { GridItemSpan(maxLineSpan) }) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        listOf(
+                            tr("Todos", "All"), tr("Estáticos", "Static"), tr("Animados (GIF)", "Animated (GIF)"), tr("Sin paquete", "Not in a pack"),
+                        ).forEachIndexed { i, label ->
+                            FilterChip(selected = vm.filter == i, onClick = { vm.filter = i }, label = { Text(label) })
+                        }
+                    }
+                    OutlinedTextField(
+                        value = vm.query,
+                        onValueChange = { vm.query = it.take(8) },
+                        placeholder = { Text(tr("Buscar por emoji…", "Search by emoji…")) },
+                        leadingIcon = { Icon(Icons.Rounded.Search, null) },
+                        trailingIcon = {
+                            if (vm.query.isNotEmpty()) IconButton(onClick = { vm.query = "" }) { Icon(Icons.Rounded.Close, null) }
+                        },
+                        singleLine = true,
+                        shape = CircleShape,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    if (visible.isEmpty()) {
+                        Text(
+                            tr("Ningún sticker con ese filtro.", "No stickers match."),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(vertical = 16.dp),
+                        )
+                    }
+                }
+            }
+            items(visible, key = { it.id }) { sticker ->
                 val selected = sticker.id in vm.selection
                 Box(
                     Modifier
@@ -312,7 +349,7 @@ fun CountBadge(n: Int) {
 }
 
 @Composable
-private fun Hero(onGallery: () -> Unit, onCamera: () -> Unit) {
+private fun Hero(onGallery: () -> Unit, onCamera: () -> Unit, onSettings: () -> Unit) {
     Box(
         Modifier
             .fillMaxWidth()
@@ -326,7 +363,10 @@ private fun Hero(onGallery: () -> Unit, onCamera: () -> Unit) {
                     Icon(Icons.Rounded.ContentCut, null, tint = Color.White, modifier = Modifier.padding(8.dp).size(20.dp))
                 }
                 Spacer(Modifier.width(10.dp))
-                Text("Stikka", style = MaterialTheme.typography.headlineLarge, color = Color.White)
+                Text("Stikka", style = MaterialTheme.typography.headlineLarge, color = Color.White, modifier = Modifier.weight(1f))
+                IconButton(onClick = onSettings) {
+                    Icon(Icons.Rounded.Settings, tr("Ajustes", "Settings"), tint = Color.White)
+                }
             }
             Spacer(Modifier.height(10.dp))
             Text(
@@ -406,11 +446,17 @@ private fun Step(icon: ImageVector, text: String) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun PackPickerSheet(packs: List<Pack>, onDismiss: () -> Unit, onPick: (Pack) -> Unit, onNew: () -> Unit) {
+fun PackPickerSheet(
+    packs: List<Pack>,
+    onDismiss: () -> Unit,
+    onPick: (Pack) -> Unit,
+    onNew: () -> Unit,
+    title: String = tr("Añadir a un paquete", "Add to a pack"),
+) {
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(Modifier.padding(bottom = 24.dp)) {
             Text(
-                tr("Añadir a un paquete", "Add to a pack"),
+                title,
                 style = MaterialTheme.typography.titleLarge,
                 modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
             )

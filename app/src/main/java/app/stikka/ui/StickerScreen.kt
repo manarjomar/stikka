@@ -20,6 +20,7 @@ import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Brush
 import androidx.compose.material.icons.rounded.EmojiEmotions
 import androidx.compose.material.icons.rounded.CalendarToday
+import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.PhotoSizeSelectActual
 import androidx.compose.material.icons.rounded.Share
@@ -79,6 +80,7 @@ fun StickerScreen(
     onAddToPack: (Pack) -> Unit,
     onNewPack: () -> Unit,
     onSetType: (Boolean) -> Unit,
+    onDuplicate: () -> Unit,
 ) {
     var confirm by remember { mutableStateOf(false) }
     var emojiPicker by remember { mutableStateOf(false) }
@@ -95,6 +97,9 @@ fun StickerScreen(
                     }
                 },
                 actions = {
+                    IconButton(onClick = onDuplicate) {
+                        Icon(Icons.Rounded.ContentCopy, tr("Duplicar", "Duplicate"))
+                    }
                     IconButton(onClick = { confirm = true }) {
                         Icon(Icons.Rounded.DeleteOutline, tr("Eliminar", "Delete"))
                     }

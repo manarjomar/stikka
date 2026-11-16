@@ -38,6 +38,8 @@ import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.FilterChip
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -79,6 +81,7 @@ fun CutoutScreen(
     onPickAnother: () -> Unit,
     onEdit: () -> Unit,
     onDecorate: () -> Unit,
+    onSubject: (Int) -> Unit,
 ) {
     Scaffold(
         topBar = {
@@ -108,7 +111,7 @@ fun CutoutScreen(
             ) { s ->
                 when (s) {
                     is CutState.Working -> WorkingView(s)
-                    is CutState.Ready -> ReadyView(s, saving, onSave, onWholeImage, onEdit, onDecorate)
+                    is CutState.Ready -> ReadyView(s, saving, onSave, onWholeImage, onEdit, onDecorate, onSubject)
                     is CutState.NoSubject -> ProblemView(
                         icon = Icons.Rounded.SearchOff,
                         title = tr("No encuentro a nadie", "Nothing to cut out"),
@@ -199,7 +202,7 @@ private fun WorkingView(s: CutState.Working) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun ReadyView(s: CutState.Ready, saving: Boolean, onSave: () -> Unit, onWholeImage: () -> Unit, onEdit: () -> Unit, onDecorate: () -> Unit) {
+private fun ReadyView(s: CutState.Ready, saving: Boolean, onSave: () -> Unit, onWholeImage: () -> Unit, onEdit: () -> Unit, onDecorate: () -> Unit, onSubject: (Int) -> Unit) {
     var showOriginal by remember { mutableStateOf(false) }
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Spacer(Modifier.height(8.dp))
@@ -211,6 +214,24 @@ private fun ReadyView(s: CutState.Ready, saving: Boolean, onSave: () -> Unit, on
                     contentScale = ContentScale.Fit,
                     modifier = Modifier.fillMaxSize().padding(if (orig) 0.dp else 8.dp),
                 )
+            }
+        }
+        if (s.subjects.size > 1) {
+            Spacer(Modifier.height(12.dp))
+            Text(
+                tr("He encontrado ${s.subjects.size} sujetos. ¿Cuál quieres?", "I found ${s.subjects.size} subjects. Which one?"),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(6.dp))
+            Row(
+                Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                FilterChip(selected = s.subjectIndex < 0, onClick = { onSubject(-1) }, label = { Text(tr("Todos", "All")) })
+                s.subjects.indices.forEach { i ->
+                    FilterChip(selected = s.subjectIndex == i, onClick = { onSubject(i) }, label = { Text("${i + 1}") })
+                }
             }
         }
         Spacer(Modifier.height(16.dp))

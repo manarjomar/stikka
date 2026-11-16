@@ -1,17 +1,27 @@
-**Stikka 0.4.1** — fixes · correcciones
+**Stikka 0.5** — settings, backup and lots more · ajustes, copia de seguridad y mucho más
 
 🇬🇧
-- **Static stickers wrongly treated as animated**: WhatsApp saves many static stickers with an "animation" mark but a single frame. They're now detected properly, and the ones already imported are fixed automatically (they become static and can be decorated).
-- Animated stickers now show a **GIF** label everywhere, and you can **change a sticker's type** (static / animated) from its screen.
-- When adding to a pack, stickers **already in the pack are shown disabled**, and the ones of the other type are dimmed.
-- **More than 30?** WhatsApp only allows 30 per pack. You can now select more, and Stikka offers to **create another pack** with the rest.
-- Warning if a pack mixes animated and static stickers.
+- **Settings & About** (⚙ on the home screen): version, privacy, credits, source code; theme (system/light/dark), wallpaper colours (Material You), language (system/Spanish/English) and default pack author.
+- **Update checker**: Stikka checks GitHub for new versions (at most once a day, can be turned off) and offers the download.
+- **Backup**: save everything (stickers, packs, decorations) to one file and restore it on any phone. Nothing is deleted when importing.
+- **Share a pack** as a `.stikka` file with someone who has Stikka.
+- **Library filters**: all / static / animated / not in a pack, and **search by emoji**.
+- **Reorder** the stickers in a pack, **duplicate** a sticker to make variants, and after saving a new sticker you're offered to **add it to a pack** straight away.
+- Pack size in KB and a warning if any sticker exceeds WhatsApp's limit.
+- **More editing**: rotate, mirror and resize the cutout, soft **shadow**, text in a **speech bubble** and **quick phrases**.
+- **Several people or objects** in a photo? Choose which one to keep, or all of them.
+- **Welcome screens** the first time.
 
 🇪🇸
-- **Stickers estáticos tomados por animados**: WhatsApp guarda muchos estáticos con una marca de «animación» pero un solo fotograma. Ahora se detectan bien, y los ya importados se corrigen solos (pasan a estáticos y se pueden decorar).
-- Los animados llevan la etiqueta **GIF** en todas partes, y puedes **cambiar el tipo** de un sticker (estático / animado) desde su pantalla.
-- Al añadir a un paquete, los que **ya están en él se ven deshabilitados**, y los del otro tipo, atenuados.
-- **¿Más de 30?** WhatsApp solo admite 30 por paquete. Ahora puedes elegir más y Stikka te propone **crear otro paquete** con el resto.
-- Aviso si un paquete mezcla animados y estáticos.
+- **Ajustes y Acerca de** (⚙ en la pantalla principal): versión, privacidad, créditos y código fuente; tema (sistema/claro/oscuro), colores del fondo de pantalla (Material You), idioma (sistema/español/inglés) y autor por defecto de los paquetes.
+- **Buscador de actualizaciones**: Stikka mira en GitHub si hay versión nueva (como mucho una vez al día, se puede desactivar) y te ofrece descargarla.
+- **Copia de seguridad**: guarda todo (stickers, paquetes y decoraciones) en un archivo y restáuralo en cualquier móvil. Al importar no se borra nada.
+- **Compartir un paquete** como archivo `.stikka` con quien tenga Stikka.
+- **Filtros en la biblioteca**: todos / estáticos / animados / sin paquete, y **búsqueda por emoji**.
+- **Ordenar** los stickers de un paquete, **duplicar** un sticker para hacer variantes y, al guardar uno nuevo, te propone **añadirlo a un paquete** al momento.
+- Tamaño del paquete en KB y aviso si algún sticker pasa del límite de WhatsApp.
+- **Más edición**: girar, voltear y cambiar el tamaño del recorte, **sombra** suave, texto en **bocadillo** y **frases rápidas**.
+- **¿Varias personas u objetos** en la foto? Elige cuál quedarte, o todos.
+- **Pantallas de bienvenida** la primera vez.
 
 Download the `.apk` file under **Assets** · Descarga el archivo `.apk` en **Assets**.

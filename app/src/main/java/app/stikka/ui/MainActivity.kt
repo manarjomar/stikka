@@ -32,6 +32,11 @@ import androidx.core.content.FileProvider
 import androidx.core.content.IntentCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import android.content.ActivityNotFoundException
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.rounded.SystemUpdate
+import kotlinx.coroutines.launch
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
@@ -127,6 +132,33 @@ class MainActivity : ComponentActivity() {
             }
         }
         val packs by vm.packs.collectAsStateWithLifecycle()
+        val exportBackup = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/zip")) { uri ->
+            if (uri != null) vm.exportBackup(uri)
+        }
+        val importBackup = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+            if (uri != null) vm.importBackup(uri)
+        }
+        val scope = androidx.compose.runtime.rememberCoroutineScope()
+        val sharePack: (Pack) -> Unit = { p ->
+            scope.launch {
+                val f = vm.packFile(p)
+                if (f == null) {
+                    vm.message = tr("No se ha podido preparar el paquete", "Couldn't prepare the pack")
+                } else {
+                    val uri = FileProvider.getUriForFile(this@MainActivity, "$packageName.files", f)
+                    val send = Intent(Intent.ACTION_SEND).apply {
+                        type = "application/octet-stream"
+                        putExtra(Intent.EXTRA_STREAM, uri)
+                        putExtra(Intent.EXTRA_TEXT, tr(
+                            "Paquete de stickers «${p.name}». Ábrelo con Stikka: Ajustes › Restaurar o importar.",
+                            "Sticker pack “${p.name}”. Open it with Stikka: Settings › Restore or import.",
+                        ))
+                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    }
+                    startActivity(Intent.createChooser(send, tr("Compartir paquete", "Share pack")))
+                }
+            }
+        }
         val openCamera = {
             val uri = newCameraUri()
             cameraUri = uri
@@ -147,24 +179,27 @@ class MainActivity : ComponentActivity() {
         val openPack = vm.openPackId?.let { id -> packs.firstOrNull { it.id == id } }
         val pickerPack = vm.pickerPackId?.let { id -> packs.firstOrNull { it.id == id } }
         val screen = when {
+            !vm.settings.onboarded -> "onboarding"
             decorator != null -> "decor"
             editor != null -> "edit"
             cut != null -> "cut"
             viewing != null -> "view"
             vm.importOpen -> "import"
+            vm.settingsOpen -> "settings"
             pickerPack != null -> "picker"
             openPack != null -> "pack"
             else -> "home"
         }
         var newPackFor by remember { mutableStateOf<String?>(null) }
 
-        BackHandler(enabled = screen != "home") {
+        BackHandler(enabled = screen != "home" && screen != "onboarding") {
             when {
                 decorator != null -> vm.closeDecorator()
                 editor != null -> vm.closeEditor()
                 cut != null -> vm.closeCut()
                 viewing != null -> vm.closeViewer()
                 vm.importOpen -> vm.closeImport()
+                vm.settingsOpen -> vm.settingsOpen = false
                 pickerPack != null -> vm.closePicker()
                 else -> vm.closePack()
             }
@@ -210,6 +245,7 @@ class MainActivity : ComponentActivity() {
                         onPickAnother = openGallery,
                         onEdit = vm::editCut,
                         onDecorate = vm::decorateCut,
+                        onSubject = vm::selectSubject,
                     )
                 }
                 "view" -> vm.viewing?.let { sticker ->
@@ -226,11 +262,19 @@ class MainActivity : ComponentActivity() {
                         onAddToPack = { p -> vm.closeViewer(); vm.addToPack(p.id, listOf(sticker.id)) },
                         onNewPack = { newPackFor = sticker.id },
                         onSetType = { vm.setStickerType(sticker, it) },
+                        onDuplicate = { vm.duplicate(sticker) },
                     )
                 }
+                "onboarding" -> OnboardingScreen(onDone = vm.settings::finishOnboarding)
+                "settings" -> SettingsScreen(
+                    vm,
+                    onExport = { exportBackup.launch("Stikka-copia-${java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.ROOT).format(java.util.Date())}.zip") },
+                    onImport = { importBackup.launch(arrayOf("application/zip", "application/octet-stream", "*/*")) },
+                    onLanguageChanged = { recreate() },
+                )
                 "import" -> ImportScreen(vm, onPickFolder = openFolderPicker)
                 "picker" -> pickerPack?.let { PickerScreen(vm, it, stickers) }
-                "pack" -> openPack?.let { PackScreen(vm, it, stickers, onAddToWhatsApp = addToWhatsApp) }
+                "pack" -> openPack?.let { PackScreen(vm, it, stickers, onAddToWhatsApp = addToWhatsApp, onShare = sharePack) }
                 else -> HomeScreen(
                     vm = vm,
                     stickers = stickers,
@@ -247,6 +291,50 @@ class MainActivity : ComponentActivity() {
                 Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = 72.dp),
             )
         }
+        }
+
+        vm.update?.let { r ->
+            androidx.compose.material3.AlertDialog(
+                onDismissRequest = vm::dismissUpdate,
+                icon = { androidx.compose.material3.Icon(androidx.compose.material.icons.Icons.Rounded.SystemUpdate, null) },
+                title = { androidx.compose.material3.Text(tr("Stikka ${r.version} disponible", "Stikka ${r.version} available")) },
+                text = {
+                    androidx.compose.foundation.layout.Column(
+                        Modifier.heightIn(max = 320.dp).verticalScroll(rememberScrollState()),
+                    ) {
+                        androidx.compose.material3.Text(
+                            r.notes.replace("**", "").ifBlank { tr("Hay una versión nueva.", "A new version is available.") },
+                            style = androidx.compose.material3.MaterialTheme.typography.bodySmall,
+                        )
+                    }
+                },
+                confirmButton = {
+                    androidx.compose.material3.TextButton(onClick = {
+                        vm.dismissUpdate()
+                        runCatching { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(r.apkUrl ?: r.pageUrl))) }
+                    }) { androidx.compose.material3.Text(tr("Descargar", "Download")) }
+                },
+                dismissButton = {
+                    androidx.compose.material3.TextButton(onClick = vm::dismissUpdate) { androidx.compose.material3.Text(tr("Más tarde", "Later")) }
+                },
+            )
+        }
+
+        vm.justSaved?.let { id ->
+            if (packs.isEmpty()) {
+                LaunchedEffect(id) {
+                    vm.justSaved = null
+                    vm.message = tr("Sticker guardado", "Sticker saved")
+                }
+            } else {
+                PackPickerSheet(
+                    packs = packs,
+                    title = tr("Guardado ✓ · ¿Añadir a un paquete?", "Saved ✓ · Add to a pack?"),
+                    onDismiss = { vm.justSaved = null },
+                    onPick = { p -> vm.justSaved = null; vm.addToPack(p.id, listOf(id)) },
+                    onNew = { vm.justSaved = null; newPackFor = id },
+                )
+            }
         }
 
         vm.overflow?.let { (packId, rest) ->

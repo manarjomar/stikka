@@ -1,6 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <!-- Solo para buscar versiones nuevas en GitHub. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
     <!-- Para saber si WhatsApp está instalada y si ya tiene nuestros paquetes. -->
     <queries>
         <package android:name="com.whatsapp" />

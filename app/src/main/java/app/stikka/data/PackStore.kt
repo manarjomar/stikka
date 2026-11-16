@@ -83,6 +83,13 @@ class PackStore(context: Context, private val stickers: StickerStore) {
         return pack
     }
 
+    /** Añade un paquete ya hecho (importado). */
+    @Synchronized
+    fun add(pack: Pack) {
+        saveAll(list() + pack)
+        refreshTray(pack)
+    }
+
     /** Cambia un paquete, sube su versión y regenera el icono. */
     @Synchronized
     fun update(id: String, change: (Pack) -> Pack): Pack? {

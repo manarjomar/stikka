@@ -35,7 +35,9 @@ import androidx.compose.material.icons.rounded.Image
 import androidx.compose.material.icons.rounded.Inventory2
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.RemoveCircleOutline
+import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material.icons.rounded.Star
+import androidx.compose.material.icons.rounded.SwapVert
 import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
@@ -211,7 +213,10 @@ fun PackScreen(
     pack: Pack,
     stickers: List<Sticker>,
     onAddToWhatsApp: (Pack) -> Unit,
+    onShare: (Pack) -> Unit,
 ) {
+    var ordering by remember { mutableStateOf(false) }
+    var newOrder by remember { mutableStateOf<List<String>>(emptyList()) }
     var menu by remember { mutableStateOf(false) }
     var rename by remember { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf(false) }
@@ -223,11 +228,41 @@ fun PackScreen(
     Scaffold(
         topBar = {
             CenterAlignedTopAppBar(
-                title = { Text(pack.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                navigationIcon = { IconButton(onClick = vm::closePack) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, tr("Volver", "Back")) } },
+                title = {
+                    Text(
+                        if (ordering) tr("Toca en el orden que quieras", "Tap in the order you want") else pack.name,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                },
+                navigationIcon = {
+                    if (ordering) {
+                        IconButton(onClick = { ordering = false }) { Icon(Icons.Rounded.Close, tr("Cancelar", "Cancel")) }
+                    } else {
+                        IconButton(onClick = vm::closePack) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, tr("Volver", "Back")) }
+                    }
+                },
                 actions = {
+                    if (ordering) {
+                        TextButton(onClick = { ordering = false; vm.reorderPack(pack.id, newOrder) }, enabled = newOrder.isNotEmpty()) {
+                            Text(tr("Guardar", "Save"))
+                        }
+                        return@CenterAlignedTopAppBar
+                    }
                     IconButton(onClick = { menu = true }) { Icon(Icons.Rounded.MoreVert, null) }
                     DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                        DropdownMenuItem(
+                            text = { Text(tr("Ordenar stickers", "Reorder stickers")) },
+                            leadingIcon = { Icon(Icons.Rounded.SwapVert, null) },
+                            onClick = { menu = false; newOrder = emptyList(); ordering = true },
+                            enabled = pack.count > 1,
+                        )
+                        DropdownMenuItem(
+                            text = { Text(tr("Compartir paquete (.stikka)", "Share pack (.stikka)")) },
+                            leadingIcon = { Icon(Icons.Rounded.Share, null) },
+                            onClick = { menu = false; onShare(pack) },
+                            enabled = pack.count > 0,
+                        )
                         DropdownMenuItem(
                             text = { Text(tr("Cambiar nombre o autor", "Rename")) },
                             leadingIcon = { Icon(Icons.Rounded.Edit, null) },
@@ -274,7 +309,8 @@ fun PackScreen(
                                 Text(pack.publisher, style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.9f))
                                 Text(
                                     tr("${pack.count} de ${Pack.MAX_STICKERS} stickers", "${pack.count} of ${Pack.MAX_STICKERS} stickers") +
-                                        if (pack.animated) tr(" · animados", " · animated") else "",
+                                        (if (pack.animated) tr(" · animados", " · animated") else "") +
+                                        " · ${(inPack.sumOf { it.sizeBytes } + 1023) / 1024} KB",
                                     style = MaterialTheme.typography.labelMedium,
                                     color = Color.White.copy(alpha = 0.9f),
                                 )
@@ -322,6 +358,22 @@ fun PackScreen(
                     }
                 }
             }
+            val oversized = inPack.filter { it.sizeBytes > (if (it.id in vm.animatedIds) 500 else 100) * 1024L }
+            if (oversized.isNotEmpty()) {
+                item(span = { GridItemSpan(maxLineSpan) }) {
+                    Surface(color = MaterialTheme.colorScheme.errorContainer, shape = MaterialTheme.shapes.medium) {
+                        Text(
+                            tr(
+                                "${oversized.size} stickers pasan del límite de WhatsApp (100 KB estáticos, 500 KB animados) y están marcados con «!». Ábrelos y guarda de nuevo, o quítalos.",
+                                "${oversized.size} stickers exceed WhatsApp's limit (100 KB static, 500 KB animated) and are marked with “!”. Open and save them again, or remove them.",
+                            ),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onErrorContainer,
+                            modifier = Modifier.padding(14.dp),
+                        )
+                    }
+                }
+            }
             val animCount = inPack.count { it.id in vm.animatedIds }
             if (animCount in 1 until inPack.size) {
                 item(span = { GridItemSpan(maxLineSpan) }) {
@@ -348,18 +400,34 @@ fun PackScreen(
                     }
                 }
             }
-            items(inPack, key = { it.id }) { s ->
+            val shown = if (ordering) inPack else inPack
+            items(shown, key = { it.id }) { s ->
                 val isTray = pack.effectiveTrayId == s.id
+                val pos = newOrder.indexOf(s.id)
                 Box(
                     Modifier
                         .aspectRatio(1f)
                         .clip(MaterialTheme.shapes.medium)
                         .background(MaterialTheme.colorScheme.surfaceContainer)
                         .then(if (isTray) Modifier.border(2.dp, MaterialTheme.colorScheme.primary, MaterialTheme.shapes.medium) else Modifier)
-                        .clickable { actionsFor = s },
+                        .clickable {
+                            if (ordering) newOrder = if (pos >= 0) newOrder - s.id else newOrder + s.id
+                            else actionsFor = s
+                        },
                 ) {
-                    StickerImage(s, Modifier.fillMaxSize().padding(8.dp))
+                    StickerImage(s, Modifier.fillMaxSize().padding(8.dp).alpha(if (ordering && pos < 0) 0.5f else 1f))
                     if (s.id in vm.animatedIds) AnimatedBadge(Modifier.align(Alignment.TopStart).padding(4.dp))
+                    if (s.sizeBytes > (if (s.id in vm.animatedIds) 500 else 100) * 1024L) {
+                        Surface(shape = CircleShape, color = MaterialTheme.colorScheme.error, modifier = Modifier.align(Alignment.BottomStart).padding(4.dp)) {
+                            Text("!", color = MaterialTheme.colorScheme.onError, style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(horizontal = 7.dp))
+                        }
+                    }
+                    if (ordering && pos >= 0) {
+                        Box(
+                            Modifier.align(Alignment.Center).size(36.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primary),
+                            contentAlignment = Alignment.Center,
+                        ) { Text("${pos + 1}", color = MaterialTheme.colorScheme.onPrimary, fontWeight = FontWeight.Bold) }
+                    }
                     if (isTray) {
                         Icon(Icons.Rounded.Star, tr("Icono", "Icon"), tint = MaterialTheme.colorScheme.primary, modifier = Modifier.align(Alignment.TopEnd).padding(4.dp).size(18.dp))
                     }

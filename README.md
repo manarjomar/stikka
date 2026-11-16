@@ -22,6 +22,9 @@
 - **Any source** – gallery, camera, or *Share → Stikka* from any app.
 - **WhatsApp-ready** – 512 × 512 px transparent WebP under 100 KB.
 - **Your library** – keep, share and delete your stickers.
+- **Packs for WhatsApp** – one tap to add them; changes update automatically. Import stickers from your chats.
+- **Edit** – brush, lasso, square, text, emojis, outline, shadow; everything stays editable.
+- **Backup & share** – one file with everything, or a single `.stikka` pack.
 - **Private** – your photos never leave your phone. No ads, no trackers, no accounts.
 
 ### Roadmap
@@ -31,7 +34,8 @@
 | **0.2** | Cutout editor: brush, lasso, rectangle/square, zoom, magnifier, undo ✅ |
 | **0.3** | Text and emojis (movable, editable), outline ✅ |
 | **0.4** | Sticker packs + **Add to WhatsApp** + import from WhatsApp ✅ |
-| 1.0 | Polish, themes, more languages |
+| **0.5** | Settings & About, update checker, backup, share packs, filters, reorder, duplicate, rotate/mirror, shadow, bubbles, multiple subjects ✅ |
+| 1.0 | Polish |
 | Later | Animated stickers from GIF/video |
 
 ### Install
@@ -46,6 +50,9 @@ Download `Stikka-X.Y.apk` from [Releases](https://github.com/manarjomar/stikka/r
 - **Desde cualquier sitio** – galería, cámara o *Compartir → Stikka* desde cualquier app.
 - **Listo para WhatsApp** – WebP transparente de 512 × 512 px y menos de 100 KB.
 - **Tu biblioteca** – guarda, comparte y elimina tus stickers.
+- **Paquetes para WhatsApp** – se añaden con un toque y los cambios se actualizan solos. Importa los stickers de tus chats.
+- **Edición** – pincel, lazo, cuadrado, textos, emojis, borde y sombra; todo queda editable.
+- **Copia y compartir** – un archivo con todo, o un paquete `.stikka`.
 - **Privado** – tus fotos no salen del móvil. Sin anuncios, sin rastreadores y sin cuentas.
 
 ### Hoja de ruta
@@ -55,7 +62,8 @@ Download `Stikka-X.Y.apk` from [Releases](https://github.com/manarjomar/stikka/r
 | **0.2** | Editor de recorte: pincel, lazo, rectángulo/cuadrado, zoom, lupa, deshacer ✅ |
 | **0.3** | Textos y emojis (movibles y editables), borde ✅ |
 | **0.4** | Paquetes + **Añadir a WhatsApp** + importar desde WhatsApp ✅ |
-| 1.0 | Pulido, temas, más idiomas |
+| **0.5** | Ajustes y Acerca de, actualizaciones, copia de seguridad, compartir paquetes, filtros, ordenar, duplicar, girar/voltear, sombra, bocadillos, varios sujetos ✅ |
+| 1.0 | Pulido |
 | Después | Stickers animados desde GIF o vídeo |
 
 ### Instalar

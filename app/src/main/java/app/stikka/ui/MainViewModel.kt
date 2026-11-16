@@ -17,6 +17,10 @@ import app.stikka.data.Sticker
 import app.stikka.data.StickerMeta
 import app.stikka.data.WaFile
 import app.stikka.data.WhatsAppImport
+import app.stikka.BuildConfig
+import app.stikka.data.Backup
+import app.stikka.domain.Release
+import app.stikka.domain.Updates
 import app.stikka.domain.WebpInfo
 import app.stikka.domain.WhatsApp
 import app.stikka.domain.Cutout
@@ -52,6 +56,10 @@ sealed interface CutState {
         val decor: Decor,
         val sticker: Bitmap,
         val autoCut: Boolean,
+        /** Máscaras de cada sujeto si se encontraron varios (vacío si solo uno). */
+        val subjects: List<FloatArray> = emptyList(),
+        /** Sujeto elegido: -1 = todos. */
+        val subjectIndex: Int = -1,
     ) : CutState
 
     data class NoSubject(val original: Bitmap) : CutState
@@ -98,6 +106,24 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     var importedOrigins by mutableStateOf<Set<String>>(emptySet())
         private set
     var importProgress by mutableStateOf<Pair<Int, Int>?>(null)
+        private set
+
+    val settings = StikkaApp.instance.settings
+    private val backup = Backup(app, store, packStore)
+
+    var settingsOpen by mutableStateOf(false)
+    /** Datos extra de cada sticker (emojis, tipo). */
+    var metas by mutableStateOf<Map<String, StickerMeta>>(emptyMap())
+        private set
+    /** Filtro de la biblioteca: 0 todos, 1 estáticos, 2 animados, 3 sin paquete. */
+    var filter by mutableStateOf(0)
+    /** Búsqueda por emoji. */
+    var query by mutableStateOf("")
+    /** Sticker recién guardado: se ofrece añadirlo a un paquete. */
+    var justSaved by mutableStateOf<String?>(null)
+    var update by mutableStateOf<Release?>(null)
+        private set
+    var checkingUpdate by mutableStateOf(false)
         private set
 
     /** Stickers marcados como animados (para mostrarlo y no mezclarlos en paquetes). */
@@ -182,6 +208,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             withContext(Dispatchers.IO) { fixStaticMarkedAsAnimated() }
             refresh()
+            // Comprobación automática de versiones nuevas, como mucho una vez al día.
+            if (settings.autoUpdateCheck && System.currentTimeMillis() - settings.lastUpdateCheck > 24 * 3600 * 1000L) {
+                checkUpdates(manual = false)
+            }
         }
     }
 
@@ -200,12 +230,14 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 cut = CutState.Working(Stage.CUTTING, original)
                 Cutout.ensureModel(getApplication()) { cut = CutState.Working(Stage.DOWNLOADING_MODEL, original) }
                 cut = CutState.Working(Stage.CUTTING, original)
-                val mask = Images.confidenceToAlpha(Cutout.confidenceMask(original))
+                val seg = Cutout.segment(original)
+                val mask = Images.confidenceToAlpha(seg.mask)
                 if (StickerMath.coverage(mask) < 0.002f) {
                     cut = CutState.NoSubject(original)
                     return@launch
                 }
-                cut = build(original, mask, autoCut = true, decor = Decor())
+                val subjects = withContext(Dispatchers.Default) { seg.subjects.map { Images.confidenceToAlpha(it) } }
+                cut = build(original, mask, autoCut = true, decor = Decor()).copy(subjects = subjects)
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e
             } catch (e: Throwable) {
@@ -221,6 +253,22 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                     original,
                 )
             }
+        }
+    }
+
+    /** Elige uno de los sujetos encontrados (-1 = todos juntos). */
+    fun selectSubject(index: Int) {
+        val ready = cut as? CutState.Ready ?: return
+        if (ready.subjects.isEmpty()) return
+        job?.cancel()
+        job = viewModelScope.launch {
+            val all = if (index < 0) {
+                withContext(Dispatchers.Default) {
+                    FloatArray(ready.mask.size) { i -> ready.subjects.maxOf { it[i] } }
+                }
+            } else ready.subjects[index]
+            cut = build(ready.original, all, autoCut = true, decor = ready.decor)
+                .copy(subjects = ready.subjects, subjectIndex = index)
         }
     }
 
@@ -250,7 +298,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         saving = true
         viewModelScope.launch {
             try {
-                withContext(Dispatchers.IO) {
+                val saved = withContext(Dispatchers.IO) {
                     store.save(
                         webp = Images.encodeWebp(ready.sticker),
                         basePng = Images.encodePng(ready.base),
@@ -261,7 +309,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 }
                 refresh()
                 cut = null
-                message = tr("Sticker guardado", "Sticker saved")
+                justSaved = saved.id
             } catch (e: Throwable) {
                 message = tr("No se ha podido guardar", "Couldn't save it")
             } finally {
@@ -426,14 +474,40 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private suspend fun refresh() {
         _stickers.value = withContext(Dispatchers.IO) { store.list() }
         _packs.value = withContext(Dispatchers.IO) { packStore.list() }
-        animatedIds = withContext(Dispatchers.IO) {
-            _stickers.value.filter { store.loadMeta(it).animated }.map { it.id }.toSet()
-        }
+        metas = withContext(Dispatchers.IO) { _stickers.value.associate { it.id to store.loadMeta(it) } }
+        animatedIds = metas.filterValues { it.animated }.keys
     }
 
     private suspend fun stickerChanged(id: String, deleted: Boolean) {
         withContext(Dispatchers.IO) { packStore.onStickerChanged(id, deleted) }
         WhatsApp.notifyChanged(getApplication())
+    }
+
+    // ---------- Biblioteca: filtros, duplicar ----------
+
+    /** Stickers que se ven en la biblioteca según el filtro y la búsqueda. */
+    fun visible(all: List<Sticker>, packs: List<Pack>): List<Sticker> {
+        val inAnyPack = packs.flatMap { it.stickerIds }.toSet()
+        val q = query.trim()
+        return all.filter { s ->
+            val m = metas[s.id]
+            val okFilter = when (filter) {
+                1 -> m?.animated != true
+                2 -> m?.animated == true
+                3 -> s.id !in inAnyPack
+                else -> true
+            }
+            okFilter && (q.isEmpty() || m?.emojis?.any { it.contains(q) || q.contains(it) } == true)
+        }
+    }
+
+    fun duplicate(sticker: Sticker) {
+        viewModelScope.launch {
+            val copy = withContext(Dispatchers.IO) { store.duplicate(sticker) }
+            refresh()
+            open(copy)
+            message = tr("Copia creada: ahora puedes cambiarla", "Copy created: now you can change it")
+        }
     }
 
     // ---------- Selección múltiple ----------
@@ -578,6 +652,21 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         return candidate
     }
 
+    /** Nuevo orden de los stickers de un paquete. */
+    fun reorderPack(packId: String, order: List<String>) {
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) {
+                packStore.update(packId) { p ->
+                    val first = order.filter { it in p.stickerIds }
+                    p.copy(stickerIds = first + p.stickerIds.filter { it !in first })
+                }
+            }
+            WhatsApp.notifyChanged(getApplication())
+            refresh()
+            message = tr("Orden guardado", "Order saved")
+        }
+    }
+
     fun removeFromPack(packId: String, stickerId: String) {
         viewModelScope.launch {
             withContext(Dispatchers.IO) { packStore.update(packId) { it.copy(stickerIds = it.stickerIds - stickerId) } }
@@ -632,6 +721,70 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             message = tr("¡Paquete añadido a WhatsApp!", "Pack added to WhatsApp!")
         }
         refreshAdded()
+    }
+
+    // ---------- Actualizaciones ----------
+
+    fun checkUpdates(manual: Boolean) {
+        if (checkingUpdate) return
+        checkingUpdate = true
+        viewModelScope.launch {
+            val r = withContext(Dispatchers.IO) { Updates.latest() }
+            checkingUpdate = false
+            settings.lastUpdateCheck = System.currentTimeMillis()
+            when {
+                r == null -> if (manual) message = tr("No se ha podido comprobar (¿sin conexión?)", "Couldn't check (offline?)")
+                Updates.isNewer(r.version, BuildConfig.VERSION_NAME) -> update = r
+                manual -> message = tr("Tienes la última versión (${BuildConfig.VERSION_NAME})", "You're up to date (${BuildConfig.VERSION_NAME})")
+            }
+        }
+    }
+
+    fun dismissUpdate() { update = null }
+
+    // ---------- Copias de seguridad y paquetes compartidos ----------
+
+    fun exportBackup(uri: Uri) {
+        viewModelScope.launch {
+            val ok = withContext(Dispatchers.IO) {
+                runCatching {
+                    getApplication<Application>().contentResolver.openOutputStream(uri)!!.use { backup.export(it) }
+                }.isSuccess
+            }
+            message = if (ok) tr("Copia guardada", "Backup saved") else tr("No se ha podido guardar la copia", "Couldn't save the backup")
+        }
+    }
+
+    fun importBackup(uri: Uri) {
+        viewModelScope.launch {
+            val r = withContext(Dispatchers.IO) {
+                runCatching {
+                    getApplication<Application>().contentResolver.openInputStream(uri)!!.use { backup.import(it) }
+                }.getOrNull()
+            }
+            if (r == null) {
+                message = tr("Ese archivo no es una copia ni un paquete de Stikka", "That file isn't a Stikka backup or pack")
+                return@launch
+            }
+            WhatsApp.notifyChanged(getApplication())
+            refresh()
+            message = buildString {
+                append(tr("Importados ${r.stickers} stickers y ${r.packs} paquetes", "Imported ${r.stickers} stickers and ${r.packs} packs"))
+                if (r.skippedPacks > 0) append(tr(" · ${r.skippedPacks} paquetes ya existían o no caben", " · ${r.skippedPacks} packs already existed or don't fit"))
+            }
+        }
+    }
+
+    /** Crea el archivo .stikka de un paquete para compartirlo. */
+    suspend fun packFile(pack: Pack): java.io.File? = withContext(Dispatchers.IO) {
+        runCatching {
+            val dir = java.io.File(getApplication<Application>().cacheDir, "share").apply { mkdirs() }
+            dir.listFiles()?.forEach { it.delete() }
+            val safe = pack.name.replace(Regex("[^A-Za-z0-9áéíóúñÁÉÍÓÚÑ _-]"), "").trim().ifEmpty { "paquete" }
+            val f = java.io.File(dir, "$safe.stikka")
+            f.outputStream().use { backup.export(it, setOf(pack.id)) }
+            f
+        }.getOrNull()
     }
 
     // ---------- Importar desde WhatsApp ----------

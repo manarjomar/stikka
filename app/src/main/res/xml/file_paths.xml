@@ -2,4 +2,5 @@
 <paths>
     <files-path name="stickers" path="stickers/" />
     <cache-path name="camera" path="camera/" />
+    <cache-path name="share" path="share/" />
 </paths>

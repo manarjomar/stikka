@@ -81,6 +81,17 @@ class StickerStore(context: Context) {
         tmp.renameTo(sticker.file)
     }
 
+    /** Copia un sticker (con su foto, máscara y decoración) para hacer variantes. */
+    fun duplicate(sticker: Sticker): Sticker {
+        val id = "${System.currentTimeMillis()}-${(1000..9999).random()}"
+        val dir = File(root, id)
+        sticker.dir.copyRecursively(dir, overwrite = false)
+        File(dir, "sticker.tmp").delete()
+        val copy = Sticker(id, dir)
+        saveMeta(copy, loadMeta(copy).copy(origin = null))
+        return copy
+    }
+
     fun loadDecor(sticker: Sticker): Decor =
         Decor.fromJson(runCatching { sticker.decorFile.readText() }.getOrNull())
 

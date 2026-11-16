@@ -105,7 +105,19 @@ private val AppTypography = Typography(
 
 @Composable
 fun StikkaTheme(content: @Composable () -> Unit) {
-    val dark = isSystemInDarkTheme()
+    val settings = app.stikka.StikkaApp.instance.settings
+    val dark = when (settings.theme) {
+        "light" -> false
+        "dark" -> true
+        else -> isSystemInDarkTheme()
+    }
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    val scheme = when {
+        settings.dynamicColor && dark -> androidx.compose.material3.dynamicDarkColorScheme(ctx)
+        settings.dynamicColor -> androidx.compose.material3.dynamicLightColorScheme(ctx)
+        dark -> Dark
+        else -> Light
+    }
     val view = LocalView.current
     if (!view.isInEditMode) {
         SideEffect {
@@ -117,7 +129,7 @@ fun StikkaTheme(content: @Composable () -> Unit) {
         }
     }
     MaterialTheme(
-        colorScheme = if (dark) Dark else Light,
+        colorScheme = scheme,
         typography = AppTypography,
         shapes = AppShapes,
         content = content,

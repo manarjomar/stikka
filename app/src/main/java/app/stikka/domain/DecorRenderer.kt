@@ -1,6 +1,7 @@
 package app.stikka.domain
 
 import android.graphics.Bitmap
+import android.graphics.BlurMaskFilter
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
@@ -18,15 +19,35 @@ object DecorRenderer {
     const val TEXT_SIZE = 64f
     const val EMOJI_SIZE = 128f
 
-    /** Recorte con borde alrededor (o el mismo recorte si no hay borde). */
+    /** Recorte con giro/espejo/tamaño, borde y sombra (todo menos las capas). */
     fun outlined(base: Bitmap, decor: Decor): Bitmap {
-        if (!decor.outline || decor.outlineWidth <= 0f) return base
+        var b = transformed(base, decor)
+        if (decor.outline && decor.outlineWidth > 0f) b = outline(b, decor.outlineColor, decor.outlineWidth)
+        if (decor.shadow) b = shadow(b)
+        return b
+    }
+
+    private fun transformed(base: Bitmap, decor: Decor): Bitmap {
+        val rot = ((decor.baseRotation % 360) + 360) % 360
+        if (rot == 0 && !decor.baseFlip && decor.baseScale == 1f) return base
+        val out = Bitmap.createBitmap(base.width, base.height, Bitmap.Config.ARGB_8888)
+        val c = Canvas(out)
+        val cx = base.width / 2f
+        val cy = base.height / 2f
+        c.translate(cx, cy)
+        c.rotate(rot.toFloat())
+        val s = decor.baseScale.coerceIn(0.3f, 1f)
+        c.scale(if (decor.baseFlip) -s else s, s)
+        c.drawBitmap(base, -cx, -cy, Paint(Paint.FILTER_BITMAP_FLAG or Paint.ANTI_ALIAS_FLAG))
+        return out
+    }
+
+    private fun outline(base: Bitmap, color: Int, w: Float): Bitmap {
         val out = Bitmap.createBitmap(base.width, base.height, Bitmap.Config.ARGB_8888)
         val c = Canvas(out)
         val silhouette = Paint(Paint.FILTER_BITMAP_FLAG).apply {
-            colorFilter = PorterDuffColorFilter(decor.outlineColor, PorterDuff.Mode.SRC_IN)
+            colorFilter = PorterDuffColorFilter(color, PorterDuff.Mode.SRC_IN)
         }
-        val w = decor.outlineWidth
         for (ring in listOf(w, w * 0.7f, w * 0.4f)) {
             var a = 0
             while (a < 360) {
@@ -35,6 +56,19 @@ object DecorRenderer {
                 a += 12
             }
         }
+        c.drawBitmap(base, 0f, 0f, null)
+        return out
+    }
+
+    private fun shadow(base: Bitmap): Bitmap {
+        val out = Bitmap.createBitmap(base.width, base.height, Bitmap.Config.ARGB_8888)
+        val c = Canvas(out)
+        val alpha = base.extractAlpha()
+        val p = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.argb(110, 0, 0, 0)
+            maskFilter = BlurMaskFilter(9f, BlurMaskFilter.Blur.NORMAL)
+        }
+        c.drawBitmap(alpha, 5f, 8f, p)
         c.drawBitmap(base, 0f, 0f, null)
         return out
     }
@@ -82,7 +116,11 @@ object DecorRenderer {
         val ls = lines(layer)
         val w = ls.maxOf { p.measureText(it) }
         val h = p.fontSpacing * ls.size
-        val pad = if (layer.kind == LayerKind.TEXT && layer.stroke) p.textSize * 0.12f else 4f
+        val pad = when {
+            layer.kind == LayerKind.TEXT && layer.bubble -> p.textSize * 0.35f
+            layer.kind == LayerKind.TEXT && layer.stroke -> p.textSize * 0.12f
+            else -> 4f
+        }
         return RectF(-w / 2 - pad, -h / 2 - pad, w / 2 + pad, h / 2 + pad)
     }
 
@@ -96,7 +134,13 @@ object DecorRenderer {
         canvas.translate(layer.x, layer.y)
         canvas.rotate(layer.rotation)
         canvas.scale(layer.scale, layer.scale)
-        val stroke = if (layer.kind == LayerKind.TEXT && layer.stroke) {
+        if (layer.kind == LayerKind.TEXT && layer.bubble) {
+            val b = localBounds(layer)
+            val bubble = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = strokeColor(layer.color) }
+            val r = fill.textSize * 0.45f
+            canvas.drawRoundRect(b, r, r, bubble)
+        }
+        val stroke = if (layer.kind == LayerKind.TEXT && layer.stroke && !layer.bubble) {
             Paint(fill).apply {
                 style = Paint.Style.STROKE
                 strokeWidth = max(4f, fill.textSize * 0.16f)

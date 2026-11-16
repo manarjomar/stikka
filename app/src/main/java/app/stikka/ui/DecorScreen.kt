@@ -31,6 +31,9 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.RotateLeft
+import androidx.compose.material.icons.rounded.RotateRight
+import androidx.compose.material.icons.rounded.Flip
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.BorderOuter
 import androidx.compose.material.icons.rounded.Check
@@ -90,6 +93,15 @@ private val TextColors = listOf(
     0xFFFFFFFF, 0xFF000000, 0xFFE0336F, 0xFFFF8A3D, 0xFFFFD54F, 0xFF66BB6A,
     0xFF29B6F6, 0xFF5C6BC0, 0xFFAB47BC, 0xFFEF5350, 0xFF8D6E63, 0xFF78909C,
 ).map { it.toInt() }
+
+private val TextTemplates: List<String>
+    get() = if (tr("es", "en") == "es") listOf(
+        "JAJAJA", "OK", "¡Buenos días!", "Buenas noches", "Gracias", "Te quiero", "¡Feliz cumple!",
+        "¿Qué?", "Sí", "No", "Jo", "¡Olé!", "Ánimo", "Lo siento", "¡Vamos!",
+    ) else listOf(
+        "LOL", "OK", "Good morning!", "Good night", "Thanks", "Love you", "Happy birthday!",
+        "What?", "Yes", "No", "Oops", "Wow!", "You got this", "Sorry", "Let's go!",
+    )
 
 private val OutlineColors = listOf(0xFFFFFFFF, 0xFF000000, 0xFFE0336F, 0xFFFFD54F, 0xFF29B6F6).map { it.toInt() }
 
@@ -263,7 +275,7 @@ private fun DecorPanel(
         Column(
             Modifier
                 .navigationBarsPadding()
-                .heightIn(max = 340.dp)
+                .heightIn(max = 380.dp)
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 16.dp, vertical = 14.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -273,6 +285,26 @@ private fun DecorPanel(
                     BigAction(Icons.Rounded.TextFields, tr("Texto", "Text"), Modifier.weight(1f), onAddText)
                     BigAction(Icons.Rounded.EmojiEmotions, tr("Emoji", "Emoji"), Modifier.weight(1f), onAddEmoji)
                 }
+                Text(tr("Recorte", "Cutout"), style = MaterialTheme.typography.titleMedium)
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    IconButton(onClick = { editor.setBase(rotation = editor.decor.baseRotation - 90) }) {
+                        Icon(Icons.Rounded.RotateLeft, tr("Girar a la izquierda", "Rotate left"))
+                    }
+                    IconButton(onClick = { editor.setBase(rotation = editor.decor.baseRotation + 90) }) {
+                        Icon(Icons.Rounded.RotateRight, tr("Girar a la derecha", "Rotate right"))
+                    }
+                    androidx.compose.material3.FilledIconToggleButton(
+                        checked = editor.decor.baseFlip,
+                        onCheckedChange = { editor.setBase(flip = it) },
+                    ) { Icon(Icons.Rounded.Flip, tr("Espejo", "Mirror")) }
+                    Spacer(Modifier.width(8.dp))
+                    FilterChip(
+                        selected = editor.decor.shadow,
+                        onClick = { editor.setBase(shadow = !editor.decor.shadow) },
+                        label = { Text(tr("Sombra", "Shadow")) },
+                    )
+                }
+                LabeledSlider(tr("Tamaño", "Size"), editor.decor.baseScale, 0.5f..1f) { editor.setBase(scale = it) }
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Rounded.BorderOuter, null, tint = MaterialTheme.colorScheme.primary)
                     Spacer(Modifier.width(12.dp))
@@ -322,9 +354,14 @@ private fun DecorPanel(
                             )
                         }
                         FilterChip(
-                            selected = selected.stroke,
-                            onClick = { editor.update(selected.id) { it.copy(stroke = !it.stroke) } },
+                            selected = selected.stroke && !selected.bubble,
+                            onClick = { editor.update(selected.id) { it.copy(stroke = !it.stroke, bubble = false) } },
                             label = { Text(tr("Contorno", "Outline")) },
+                        )
+                        FilterChip(
+                            selected = selected.bubble,
+                            onClick = { editor.update(selected.id) { it.copy(bubble = !it.bubble) } },
+                            label = { Text(tr("Bocadillo", "Bubble")) },
                         )
                     }
                 }
@@ -410,14 +447,22 @@ private fun TextDialog(initial: String, onDismiss: () -> Unit, onConfirm: (Strin
         icon = { Icon(Icons.Rounded.TextFields, null) },
         title = { Text(if (initial.isEmpty()) tr("Añadir texto", "Add text") else tr("Cambiar texto", "Edit text")) },
         text = {
-            OutlinedTextField(
-                value = text,
-                onValueChange = { text = it },
-                placeholder = { Text(tr("Escribe aquí…", "Type here…")) },
-                minLines = 1,
-                maxLines = 4,
-                modifier = Modifier.fillMaxWidth(),
-            )
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                OutlinedTextField(
+                    value = text,
+                    onValueChange = { text = it },
+                    placeholder = { Text(tr("Escribe aquí…", "Type here…")) },
+                    minLines = 1,
+                    maxLines = 4,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Text(tr("Rápidos", "Quick"), style = MaterialTheme.typography.labelLarge)
+                Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TextTemplates.forEach { t ->
+                        androidx.compose.material3.SuggestionChip(onClick = { text = t }, label = { Text(t) })
+                    }
+                }
+            }
         },
         confirmButton = {
             TextButton(onClick = { onConfirm(text.trim()) }, enabled = text.isNotBlank()) { Text(tr("Aceptar", "OK")) }

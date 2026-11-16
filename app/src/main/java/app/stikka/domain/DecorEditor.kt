@@ -11,14 +11,14 @@ class DecorEditor(val base: Bitmap, initial: Decor, val target: EditTarget) {
         private set
     var selectedId by mutableStateOf<Long?>(null)
 
-    private var outlineKey: Triple<Boolean, Int, Float>? = null
+    private var outlineKey: Decor? = null
     private var outlineCache: Bitmap = base
 
     val selected: Layer? get() = decor.layers.firstOrNull { it.id == selectedId }
 
     /** Recorte con borde, recalculado solo cuando cambia el borde. */
     fun outlinedBase(): Bitmap {
-        val key = Triple(decor.outline, decor.outlineColor, decor.outlineWidth)
+        val key = decor.baseKey
         if (key != outlineKey) {
             outlineCache = DecorRenderer.outlined(base, decor)
             outlineKey = key
@@ -28,6 +28,10 @@ class DecorEditor(val base: Bitmap, initial: Decor, val target: EditTarget) {
 
     fun setOutline(enabled: Boolean = decor.outline, color: Int = decor.outlineColor, width: Float = decor.outlineWidth) {
         decor = decor.copy(outline = enabled, outlineColor = color, outlineWidth = width)
+    }
+
+    fun setBase(rotation: Int = decor.baseRotation, flip: Boolean = decor.baseFlip, scale: Float = decor.baseScale, shadow: Boolean = decor.shadow) {
+        decor = decor.copy(baseRotation = rotation, baseFlip = flip, baseScale = scale, shadow = shadow)
     }
 
     fun addText(text: String) {
