@@ -33,14 +33,18 @@ object Images {
         return if (bitmap.config == Bitmap.Config.ARGB_8888) bitmap else bitmap.copy(Bitmap.Config.ARGB_8888, false)
     }
 
-    /** Aplica la máscara: lo que no es sujeto queda transparente. */
+    /** Pasa la confianza del modelo a transparencia final (0..1) con borde suave. */
+    fun confidenceToAlpha(confidence: FloatArray): FloatArray =
+        FloatArray(confidence.size) { StickerMath.alphaFor(confidence[it]) / 255f }
+
+    /** Aplica la máscara (transparencia 0..1): lo que no es sujeto queda transparente. */
     fun applyMask(source: Bitmap, mask: FloatArray): Bitmap {
         val w = source.width
         val h = source.height
         val px = IntArray(w * h)
         source.getPixels(px, 0, w, 0, 0, w, h)
         for (i in px.indices) {
-            val a = StickerMath.alphaFor(mask[i])
+            val a = (mask[i].coerceIn(0f, 1f) * 255f).roundToInt()
             px[i] = (px[i] and 0x00FFFFFF) or (a shl 24)
         }
         return Bitmap.createBitmap(px, w, h, Bitmap.Config.ARGB_8888)
@@ -105,5 +109,14 @@ object Images {
         }
         val bmp = Bitmap.createBitmap(px, width, height, Bitmap.Config.ARGB_8888)
         return ByteArrayOutputStream().also { bmp.compress(Bitmap.CompressFormat.PNG, 100, it) }.toByteArray()
+    }
+
+    /** Lee una máscara guardada con [encodeMask]. */
+    fun decodeMask(bitmap: Bitmap, width: Int, height: Int): FloatArray {
+        val m = if (bitmap.width == width && bitmap.height == height) bitmap
+        else Bitmap.createScaledBitmap(bitmap, width, height, true)
+        val px = IntArray(width * height)
+        m.getPixels(px, 0, width, 0, 0, width, height)
+        return FloatArray(px.size) { (px[it] shr 16 and 0xFF) / 255f }
     }
 }

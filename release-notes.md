@@ -1,17 +1,19 @@
-**Stikka 0.1** — first version · primera versión
+**Stikka 0.2** — fine-tune the cutout · retocar el recorte
 
 🇬🇧
-- Turn any photo into a sticker: pick it from the gallery, take it with the camera or share it to Stikka from any app.
-- **Smart cutout**: the person, pet or object is cut out automatically, on your phone.
-- Stickers are saved at 512 × 512 px in WebP under 100 KB, ready for WhatsApp.
-- Your sticker library, with sharing and deleting.
-- The first time, Google Play Services downloads the cutout model (needs a connection once).
+- New **cutout editor**, from a new sticker or any saved one:
+  - **Brush** to erase or restore, with adjustable size.
+  - **Lasso** (freehand) and **rectangle / square** (1:1 lock): cut out the shape, keep only inside, add or remove.
+  - **Pinch to zoom** and move with two fingers, with a **magnifier** that shows what's under your finger.
+  - **Mask view** (removed parts in red), **undo / redo** and back to start.
+- Edited stickers are updated in place.
 
 🇪🇸
-- Convierte cualquier foto en sticker: elígela de la galería, hazla con la cámara o compártela a Stikka desde cualquier app.
-- **Recorte inteligente**: la persona, mascota u objeto se recorta solo, en tu móvil.
-- Los stickers se guardan a 512 × 512 px en WebP de menos de 100 KB, listos para WhatsApp.
-- Biblioteca de stickers, para compartirlos o eliminarlos.
-- La primera vez, Google Play Services descarga el modelo de recorte (necesita conexión una vez).
+- Nuevo **editor de recorte**, al crear un sticker o sobre cualquiera ya guardado:
+  - **Pincel** para borrar o restaurar, con tamaño ajustable.
+  - **Lazo** a mano alzada y **rectángulo / cuadrado** (bloqueo 1:1): recortar la forma, conservar solo lo de dentro, añadir o quitar.
+  - **Zoom y desplazamiento con dos dedos**, con **lupa** para ver lo que hay bajo el dedo.
+  - **Vista de máscara** (lo eliminado en rojo), **deshacer / rehacer** y volver al inicio.
+- Los stickers retocados se actualizan.
 
 Download the `.apk` file under **Assets** · Descarga el archivo `.apk` en **Assets**.

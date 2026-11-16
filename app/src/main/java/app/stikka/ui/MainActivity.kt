@@ -116,14 +116,20 @@ class MainActivity : ComponentActivity() {
 
         val cut = vm.cut
         val viewing = vm.viewing
+        val editor = vm.editor
         val screen = when {
+            editor != null -> "edit"
             cut != null -> "cut"
             viewing != null -> "view"
             else -> "home"
         }
 
         BackHandler(enabled = screen != "home") {
-            if (cut != null) vm.closeCut() else vm.closeViewer()
+            when {
+                editor != null -> vm.closeEditor()
+                cut != null -> vm.closeCut()
+                else -> vm.closeViewer()
+            }
         }
 
         AnimatedContent(
@@ -132,6 +138,14 @@ class MainActivity : ComponentActivity() {
             label = "screen",
         ) { target ->
             when (target) {
+                "edit" -> vm.editor?.let { e ->
+                    MaskEditorScreen(
+                        editor = e,
+                        saving = vm.saving,
+                        onClose = vm::closeEditor,
+                        onDone = vm::finishEditor,
+                    )
+                }
                 "cut" -> vm.cut?.let { state ->
                     CutoutScreen(
                         state = state,
@@ -140,6 +154,7 @@ class MainActivity : ComponentActivity() {
                         onSave = vm::saveCut,
                         onWholeImage = vm::useWholeImage,
                         onPickAnother = openGallery,
+                        onEdit = vm::editCut,
                     )
                 }
                 "view" -> vm.viewing?.let { sticker ->
@@ -148,6 +163,7 @@ class MainActivity : ComponentActivity() {
                         onBack = vm::closeViewer,
                         onShare = ::share,
                         onDelete = vm::delete,
+                        onEdit = vm::editSticker,
                     )
                 }
                 else -> HomeScreen(

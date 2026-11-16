@@ -10,7 +10,10 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import app.stikka.StikkaApp
 import app.stikka.data.Sticker
+import android.graphics.BitmapFactory
 import app.stikka.domain.Cutout
+import app.stikka.domain.EditTarget
+import app.stikka.domain.MaskEditor
 import app.stikka.domain.Images
 import app.stikka.domain.StickerMath
 import app.stikka.domain.tr
@@ -49,6 +52,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     var saving by mutableStateOf(false)
         private set
     var message by mutableStateOf<String?>(null)
+    var editor by mutableStateOf<MaskEditor?>(null)
+        private set
 
     private var job: Job? = null
 
@@ -63,7 +68,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 cut = CutState.Working(Stage.CUTTING, original)
                 Cutout.ensureModel(getApplication()) { cut = CutState.Working(Stage.DOWNLOADING_MODEL, original) }
                 cut = CutState.Working(Stage.CUTTING, original)
-                val mask = Cutout.confidenceMask(original)
+                val mask = Images.confidenceToAlpha(Cutout.confidenceMask(original))
                 if (StickerMath.coverage(mask) < 0.002f) {
                     cut = CutState.NoSubject(original)
                     return@launch
@@ -131,6 +136,72 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             }
         }
     }
+
+    /** Abre el editor sobre el recorte recién hecho. */
+    fun editCut() {
+        val ready = cut as? CutState.Ready ?: return
+        editor = MaskEditor(ready.original, ready.mask, EditTarget.NewCut)
+    }
+
+    /** Abre el editor sobre un sticker guardado. */
+    fun editSticker(sticker: Sticker) {
+        if (!sticker.editable || saving) return
+        viewModelScope.launch {
+            val loaded = withContext(Dispatchers.IO) {
+                runCatching {
+                    val opts = BitmapFactory.Options().apply { inPreferredConfig = Bitmap.Config.ARGB_8888 }
+                    val src = BitmapFactory.decodeFile(sticker.sourceFile.absolutePath, opts)!!
+                    val maskBmp = BitmapFactory.decodeFile(sticker.maskFile.absolutePath, opts)!!
+                    src to Images.decodeMask(maskBmp, src.width, src.height)
+                }.getOrNull()
+            }
+            if (loaded == null) {
+                message = tr("No se puede retocar este sticker", "This sticker can't be edited")
+            } else {
+                editor = MaskEditor(loaded.first, loaded.second, EditTarget.Saved(sticker.id))
+            }
+        }
+    }
+
+    fun closeEditor() { editor = null }
+
+    fun finishEditor() {
+        val e = editor ?: return
+        if (saving) return
+        val mask = e.maskFloats()
+        when (val t = e.target) {
+            EditTarget.NewCut -> viewModelScope.launch {
+                cut = build(e.source, mask, autoCut = true)
+                editor = null
+            }
+            is EditTarget.Saved -> {
+                saving = true
+                viewModelScope.launch {
+                    try {
+                        withContext(Dispatchers.Default) {
+                            val sticker = store.get(t.stickerId) ?: return@withContext
+                            val rendered = Images.renderSticker(Images.applyMask(e.source, mask), mask)
+                            val webp = Images.encodeWebp(rendered)
+                            val png = Images.encodeMask(mask, e.width, e.height)
+                            store.update(sticker, webp, png)
+                            onStickerChanged(sticker.id)
+                        }
+                        refresh()
+                        viewing = viewing?.let { store.get(it.id) }
+                        editor = null
+                        message = tr("Recorte actualizado", "Cutout updated")
+                    } catch (x: Throwable) {
+                        message = tr("No se ha podido guardar", "Couldn't save it")
+                    } finally {
+                        saving = false
+                    }
+                }
+            }
+        }
+    }
+
+    /** Punto de enganche para avisar a los paquetes de que un sticker ha cambiado. */
+    private fun onStickerChanged(@Suppress("UNUSED_PARAMETER") id: String) {}
 
     fun closeCut() {
         job?.cancel()

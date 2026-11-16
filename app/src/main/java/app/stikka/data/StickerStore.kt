@@ -10,6 +10,10 @@ data class Sticker(val id: String, val dir: File) {
     val sizeBytes: Long get() = file.length()
     /** Cambia cada vez que se reescribe el archivo, para refrescar las imágenes. */
     val version: Long get() = file.lastModified()
+    val sourceFile: File get() = File(dir, "source.jpg")
+    val maskFile: File get() = File(dir, "mask.png")
+    /** Se puede retocar si guardamos la foto original y la máscara. */
+    val editable: Boolean get() = sourceFile.exists() && maskFile.exists()
 }
 
 /** Almacén sencillo en la memoria interna de la app: una carpeta por sticker. */
@@ -30,6 +34,16 @@ class StickerStore(context: Context) {
         // El sticker se escribe el último: si algo falla antes, no aparece en la lista.
         File(dir, "sticker.webp").writeBytes(webp)
         return Sticker(id, dir)
+    }
+
+    fun get(id: String): Sticker? = File(root, id).takeIf { File(it, "sticker.webp").exists() }?.let { Sticker(id, it) }
+
+    /** Reescribe un sticker retocado. */
+    fun update(sticker: Sticker, webp: ByteArray, maskPng: ByteArray) {
+        sticker.maskFile.writeBytes(maskPng)
+        val tmp = File(sticker.dir, "sticker.tmp")
+        tmp.writeBytes(webp)
+        tmp.renameTo(sticker.file)
     }
 
     fun delete(sticker: Sticker) {

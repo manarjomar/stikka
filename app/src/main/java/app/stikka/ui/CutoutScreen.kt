@@ -24,6 +24,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AutoAwesome
+import androidx.compose.material.icons.rounded.Brush
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.CloudDownload
@@ -35,6 +36,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -74,6 +76,7 @@ fun CutoutScreen(
     onSave: () -> Unit,
     onWholeImage: () -> Unit,
     onPickAnother: () -> Unit,
+    onEdit: () -> Unit,
 ) {
     Scaffold(
         topBar = {
@@ -103,7 +106,7 @@ fun CutoutScreen(
             ) { s ->
                 when (s) {
                     is CutState.Working -> WorkingView(s)
-                    is CutState.Ready -> ReadyView(s, saving, onSave, onWholeImage)
+                    is CutState.Ready -> ReadyView(s, saving, onSave, onWholeImage, onEdit)
                     is CutState.NoSubject -> ProblemView(
                         icon = Icons.Rounded.SearchOff,
                         title = tr("No encuentro a nadie", "Nothing to cut out"),
@@ -194,7 +197,7 @@ private fun WorkingView(s: CutState.Working) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun ReadyView(s: CutState.Ready, saving: Boolean, onSave: () -> Unit, onWholeImage: () -> Unit) {
+private fun ReadyView(s: CutState.Ready, saving: Boolean, onSave: () -> Unit, onWholeImage: () -> Unit, onEdit: () -> Unit) {
     var showOriginal by remember { mutableStateOf(false) }
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Spacer(Modifier.height(8.dp))
@@ -248,6 +251,12 @@ private fun ReadyView(s: CutState.Ready, saving: Boolean, onSave: () -> Unit, on
             }
         }
         Spacer(Modifier.height(20.dp))
+        FilledTonalButton(onClick = onEdit, enabled = !saving, modifier = Modifier.fillMaxWidth().height(52.dp)) {
+            Icon(Icons.Rounded.Brush, null)
+            Spacer(Modifier.width(10.dp))
+            Text(tr("Retocar: pincel, lazo o cuadrado", "Fine-tune: brush, lasso or square"))
+        }
+        Spacer(Modifier.height(10.dp))
         Button(
             onClick = onSave,
             enabled = !saving,

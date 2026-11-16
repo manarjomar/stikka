@@ -17,6 +17,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.rounded.Brush
 import androidx.compose.material.icons.rounded.CalendarToday
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.PhotoSizeSelectActual
@@ -26,6 +27,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -59,6 +61,7 @@ fun StickerScreen(
     onBack: () -> Unit,
     onShare: (Sticker) -> Unit,
     onDelete: (Sticker) -> Unit,
+    onEdit: (Sticker) -> Unit,
 ) {
     var confirm by remember { mutableStateOf(false) }
 
@@ -126,6 +129,14 @@ fun StickerScreen(
                 Spacer(Modifier.width(10.dp))
                 Text(tr("Compartir", "Share"), style = MaterialTheme.typography.titleMedium)
             }
+            if (sticker.editable) {
+                Spacer(Modifier.height(10.dp))
+                FilledTonalButton(onClick = { onEdit(sticker) }, modifier = Modifier.fillMaxWidth().height(52.dp)) {
+                    Icon(Icons.Rounded.Brush, null)
+                    Spacer(Modifier.width(10.dp))
+                    Text(tr("Retocar recorte", "Fine-tune cutout"))
+                }
+            }
             Spacer(Modifier.height(10.dp))
             OutlinedButton(onClick = { confirm = true }, modifier = Modifier.fillMaxWidth().height(52.dp)) {
                 Icon(Icons.Rounded.DeleteOutline, null)
@@ -135,8 +146,8 @@ fun StickerScreen(
             Spacer(Modifier.height(16.dp))
             Text(
                 tr(
-                    "Próximamente: retocar el recorte con zoom y añadir tus stickers a WhatsApp en paquetes.",
-                    "Coming soon: fine-tune the cutout with zoom and add your stickers to WhatsApp as packs.",
+                    "Próximamente: textos, emojis y paquetes para añadir a WhatsApp.",
+                    "Coming soon: text, emojis and packs to add to WhatsApp.",
                 ),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
