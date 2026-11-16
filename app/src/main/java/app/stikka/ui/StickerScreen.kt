@@ -51,6 +51,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.material3.SegmentedButton
 import app.stikka.data.Pack
 import app.stikka.data.Sticker
 import app.stikka.data.StickerMeta
@@ -210,12 +211,12 @@ fun StickerScreen(
                     )
                     Spacer(Modifier.height(8.dp))
                     androidx.compose.material3.SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
-                        androidx.compose.material3.SegmentedButton(
+                        SegmentedButton(
                             selected = !meta.animated,
                             onClick = { if (meta.animated) onSetType(false) },
                             shape = androidx.compose.material3.SegmentedButtonDefaults.itemShape(0, 2),
                         ) { Text(tr("Estático", "Static")) }
-                        androidx.compose.material3.SegmentedButton(
+                        SegmentedButton(
                             selected = meta.animated,
                             onClick = { if (!meta.animated) onSetType(true) },
                             shape = androidx.compose.material3.SegmentedButtonDefaults.itemShape(1, 2),
