@@ -77,6 +77,7 @@ fun StickerScreen(
     onEmojis: (List<String>) -> Unit,
     onAddToPack: (Pack) -> Unit,
     onNewPack: () -> Unit,
+    onSetType: (Boolean) -> Unit,
 ) {
     var confirm by remember { mutableStateOf(false) }
     var emojiPicker by remember { mutableStateOf(false) }
@@ -199,6 +200,26 @@ fun StickerScreen(
                                 Text(e, fontSize = 24.sp, modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp))
                             }
                         }
+                    }
+                    Spacer(Modifier.height(14.dp))
+                    Text(tr("Tipo", "Type"), style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        tr("Corrígelo si está mal: los paquetes no mezclan animados y estáticos.", "Fix it if it's wrong: packs can't mix animated and static."),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    androidx.compose.material3.SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+                        androidx.compose.material3.SegmentedButton(
+                            selected = !meta.animated,
+                            onClick = { if (meta.animated) onSetType(false) },
+                            shape = androidx.compose.material3.SegmentedButtonDefaults.itemShape(0, 2),
+                        ) { Text(tr("Estático", "Static")) }
+                        androidx.compose.material3.SegmentedButton(
+                            selected = meta.animated,
+                            onClick = { if (!meta.animated) onSetType(true) },
+                            shape = androidx.compose.material3.SegmentedButtonDefaults.itemShape(1, 2),
+                        ) { Text(tr("Animado (GIF)", "Animated (GIF)")) }
                     }
                     if (inPacks.isNotEmpty()) {
                         Spacer(Modifier.height(12.dp))

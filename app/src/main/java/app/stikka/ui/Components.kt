@@ -9,6 +9,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Icon
@@ -105,3 +106,20 @@ val EmojiList: List<String> = (
         "🐻 🐼 🐨 🐯 🦁 🐮 🐷 🐸 🐵 🐔 🐧 🦄 🐝 🦋 🌹 🌻 🌸 🍀 ✅ ❌ ❓ ❗ 🆗 🆒 🆕 🔝 📍 📸 💰 🚀"
     ).split(' ').filter { it.isNotBlank() }
 
+
+/** Etiqueta pequeña para los stickers animados. */
+@Composable
+fun AnimatedBadge(modifier: Modifier = Modifier) {
+    androidx.compose.material3.Surface(
+        shape = androidx.compose.foundation.shape.RoundedCornerShape(6.dp),
+        color = Brand.Raspberry,
+        modifier = modifier,
+    ) {
+        androidx.compose.material3.Text(
+            "GIF",
+            style = MaterialTheme.typography.labelSmall,
+            color = Color.White,
+            modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp),
+        )
+    }
+}

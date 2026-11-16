@@ -1,19 +1,17 @@
-**Stikka 0.4** — packs and WhatsApp · paquetes y WhatsApp
+**Stikka 0.4.1** — fixes · correcciones
 
 🇬🇧
-- **Sticker packs**: create packs with name and author, add 3 to 30 stickers, choose the pack icon, reorder by removing and adding, rename or delete.
-- **Add to WhatsApp** with one tap (WhatsApp and WhatsApp Business). Packs you've already added show “In WhatsApp”, and any change you make — editing a sticker, adding or removing — is picked up by WhatsApp automatically.
-- **Emojis for WhatsApp** on each sticker (1 to 3), so WhatsApp can suggest it.
-- **Import from WhatsApp**: pick the “WhatsApp Stickers” folder once and bring in the stickers from your chats (static and animated), skipping the ones already imported.
-- **Multi-select** in your library (long-press): add many stickers to a pack at once or delete them.
-- New bottom bar: Stickers · Packs.
+- **Static stickers wrongly treated as animated**: WhatsApp saves many static stickers with an "animation" mark but a single frame. They're now detected properly, and the ones already imported are fixed automatically (they become static and can be decorated).
+- Animated stickers now show a **GIF** label everywhere, and you can **change a sticker's type** (static / animated) from its screen.
+- When adding to a pack, stickers **already in the pack are shown disabled**, and the ones of the other type are dimmed.
+- **More than 30?** WhatsApp only allows 30 per pack. You can now select more, and Stikka offers to **create another pack** with the rest.
+- Warning if a pack mixes animated and static stickers.
 
 🇪🇸
-- **Paquetes de stickers**: crea paquetes con nombre y autor, añade de 3 a 30 stickers, elige el icono, cambia el nombre o elimínalos.
-- **Añadir a WhatsApp** con un toque (WhatsApp y WhatsApp Business). Los paquetes ya añadidos aparecen como «En WhatsApp», y cualquier cambio (retocar un sticker, añadir o quitar) le llega a WhatsApp solo.
-- **Emojis para WhatsApp** en cada sticker (de 1 a 3), para que WhatsApp lo sugiera.
-- **Importar de WhatsApp**: elige una vez la carpeta «WhatsApp Stickers» y trae los stickers de tus chats (estáticos y animados), sin repetir los ya importados.
-- **Selección múltiple** en la biblioteca (pulsación larga): añade muchos stickers a un paquete a la vez o elimínalos.
-- Nueva barra inferior: Stickers · Paquetes.
+- **Stickers estáticos tomados por animados**: WhatsApp guarda muchos estáticos con una marca de «animación» pero un solo fotograma. Ahora se detectan bien, y los ya importados se corrigen solos (pasan a estáticos y se pueden decorar).
+- Los animados llevan la etiqueta **GIF** en todas partes, y puedes **cambiar el tipo** de un sticker (estático / animado) desde su pantalla.
+- Al añadir a un paquete, los que **ya están en él se ven deshabilitados**, y los del otro tipo, atenuados.
+- **¿Más de 30?** WhatsApp solo admite 30 por paquete. Ahora puedes elegir más y Stikka te propone **crear otro paquete** con el resto.
+- Aviso si un paquete mezcla animados y estáticos.
 
 Download the `.apk` file under **Assets** · Descarga el archivo `.apk` en **Assets**.

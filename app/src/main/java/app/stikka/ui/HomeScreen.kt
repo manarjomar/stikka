@@ -284,6 +284,7 @@ private fun StickersTab(
                         ),
                 ) {
                     StickerImage(sticker, Modifier.fillMaxWidth().aspectRatio(1f).padding(10.dp))
+                    if (sticker.id in vm.animatedIds) AnimatedBadge(Modifier.align(Alignment.TopStart).padding(6.dp))
                     if (selected) {
                         Icon(
                             Icons.Rounded.CheckCircle,

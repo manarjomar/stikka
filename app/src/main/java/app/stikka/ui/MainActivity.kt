@@ -225,6 +225,7 @@ class MainActivity : ComponentActivity() {
                         onEmojis = { vm.setEmojis(sticker, it) },
                         onAddToPack = { p -> vm.closeViewer(); vm.addToPack(p.id, listOf(sticker.id)) },
                         onNewPack = { newPackFor = sticker.id },
+                        onSetType = { vm.setStickerType(sticker, it) },
                     )
                 }
                 "import" -> ImportScreen(vm, onPickFolder = openFolderPicker)
@@ -246,6 +247,32 @@ class MainActivity : ComponentActivity() {
                 Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = 72.dp),
             )
         }
+        }
+
+        vm.overflow?.let { (packId, rest) ->
+            val name = packs.firstOrNull { it.id == packId }?.name.orEmpty()
+            androidx.compose.material3.AlertDialog(
+                onDismissRequest = vm::dismissOverflow,
+                title = { androidx.compose.material3.Text(tr("«$name» está lleno", "“$name” is full")) },
+                text = {
+                    androidx.compose.material3.Text(
+                        tr(
+                            "WhatsApp admite como máximo 30 stickers por paquete. ¿Creo otro paquete con los ${rest.size} que no han cabido?",
+                            "WhatsApp allows up to 30 stickers per pack. Shall I create another pack with the ${rest.size} that didn't fit?",
+                        )
+                    )
+                },
+                confirmButton = {
+                    androidx.compose.material3.TextButton(onClick = vm::acceptOverflow) {
+                        androidx.compose.material3.Text(tr("Crear otro paquete", "Create another pack"))
+                    }
+                },
+                dismissButton = {
+                    androidx.compose.material3.TextButton(onClick = vm::dismissOverflow) {
+                        androidx.compose.material3.Text(tr("No", "No"))
+                    }
+                },
+            )
         }
 
         newPackFor?.let { id ->

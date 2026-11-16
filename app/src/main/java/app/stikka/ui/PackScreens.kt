@@ -66,6 +66,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -321,6 +322,22 @@ fun PackScreen(
                     }
                 }
             }
+            val animCount = inPack.count { it.id in vm.animatedIds }
+            if (animCount in 1 until inPack.size) {
+                item(span = { GridItemSpan(maxLineSpan) }) {
+                    Surface(color = MaterialTheme.colorScheme.errorContainer, shape = MaterialTheme.shapes.medium) {
+                        Text(
+                            tr(
+                                "Este paquete mezcla $animCount animados (GIF) y ${inPack.size - animCount} estáticos, y WhatsApp no lo aceptará. Quita los que sobren o corrige su tipo desde cada sticker.",
+                                "This pack mixes $animCount animated (GIF) and ${inPack.size - animCount} static stickers, which WhatsApp won't accept. Remove the extra ones or fix their type from each sticker.",
+                            ),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onErrorContainer,
+                            modifier = Modifier.padding(14.dp),
+                        )
+                    }
+                }
+            }
             item(span = { GridItemSpan(maxLineSpan) }) {
                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 8.dp)) {
                     Text(tr("Stickers del paquete", "Stickers in this pack"), style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
@@ -342,6 +359,7 @@ fun PackScreen(
                         .clickable { actionsFor = s },
                 ) {
                     StickerImage(s, Modifier.fillMaxSize().padding(8.dp))
+                    if (s.id in vm.animatedIds) AnimatedBadge(Modifier.align(Alignment.TopStart).padding(4.dp))
                     if (isTray) {
                         Icon(Icons.Rounded.Star, tr("Icono", "Icon"), tint = MaterialTheme.colorScheme.primary, modifier = Modifier.align(Alignment.TopEnd).padding(4.dp).size(18.dp))
                     }
@@ -420,13 +438,19 @@ private fun StickerActionsSheet(onDismiss: () -> Unit, onTray: () -> Unit, onRem
     }
 }
 
-/** Elegir stickers de la biblioteca para añadirlos a un paquete. */
+/**
+ * Elegir stickers de la biblioteca para añadirlos a un paquete.
+ * Los que ya están en el paquete se ven deshabilitados; los de otro tipo (animado/estático), atenuados.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PickerScreen(vm: MainViewModel, pack: Pack, stickers: List<Sticker>) {
-    var chosen by remember { mutableStateOf<Set<String>>(emptySet()) }
-    val available = stickers.filter { it.id !in pack.stickerIds }
+    var chosen by remember { mutableStateOf<List<String>>(emptyList()) }
     val room = Pack.MAX_STICKERS - pack.count
+    // Tipo del paquete: el de sus stickers o, si está vacío, el del primero que se elija.
+    val packType: Boolean? = pack.stickerIds.firstOrNull()?.let { it in vm.animatedIds }
+        ?: chosen.firstOrNull()?.let { it in vm.animatedIds }
+    val sorted = remember(stickers, pack.stickerIds) { stickers.sortedBy { it.id in pack.stickerIds } }
 
     Scaffold(
         topBar = {
@@ -438,26 +462,36 @@ fun PickerScreen(vm: MainViewModel, pack: Pack, stickers: List<Sticker>) {
         },
         bottomBar = {
             Surface(color = MaterialTheme.colorScheme.surfaceContainer) {
-                Row(
-                    Modifier.fillMaxWidth().navigationBarsPadding().padding(16.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(
-                        tr("${chosen.size} elegidos · caben $room", "${chosen.size} chosen · room for $room"),
-                        style = MaterialTheme.typography.bodyMedium,
-                        modifier = Modifier.weight(1f),
-                    )
-                    Button(onClick = { vm.addToPack(pack.id, chosen) }, enabled = chosen.isNotEmpty()) {
-                        Text(tr("Añadir (${chosen.size})", "Add (${chosen.size})"))
+                Column(Modifier.fillMaxWidth().navigationBarsPadding().padding(16.dp)) {
+                    if (chosen.size > room) {
+                        Text(
+                            tr(
+                                "WhatsApp admite 30 stickers por paquete: caben $room. Con los ${chosen.size - room} restantes te propondré crear otro paquete.",
+                                "WhatsApp allows 30 stickers per pack: $room fit. I'll offer to create another pack with the other ${chosen.size - room}.",
+                            ),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(bottom = 8.dp),
+                        )
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            tr("${chosen.size} elegidos · caben $room", "${chosen.size} chosen · room for $room"),
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier.weight(1f),
+                        )
+                        Button(onClick = { vm.addToPack(pack.id, chosen) }, enabled = chosen.isNotEmpty()) {
+                            Text(tr("Añadir (${chosen.size})", "Add (${chosen.size})"))
+                        }
                     }
                 }
             }
         },
     ) { padding ->
-        if (available.isEmpty()) {
+        if (stickers.isEmpty()) {
             Box(Modifier.padding(padding).fillMaxSize().padding(32.dp), contentAlignment = Alignment.Center) {
                 Text(
-                    tr("No hay más stickers en tu biblioteca. Crea o importa algunos.", "There are no more stickers in your library. Create or import some."),
+                    tr("Tu biblioteca está vacía. Crea o importa stickers.", "Your library is empty. Create or import stickers."),
                     textAlign = TextAlign.Center,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -474,7 +508,24 @@ fun PickerScreen(vm: MainViewModel, pack: Pack, stickers: List<Sticker>) {
             horizontalArrangement = Arrangement.spacedBy(10.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            items(available, key = { it.id }) { s ->
+            item(span = { GridItemSpan(maxLineSpan) }) {
+                Row(horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        AnimatedBadge()
+                        Spacer(Modifier.width(6.dp))
+                        Text(tr("animado", "animated"), style = MaterialTheme.typography.labelMedium)
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Rounded.CheckCircle, null, tint = MaterialTheme.colorScheme.outline, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text(tr("ya en el paquete", "already in pack"), style = MaterialTheme.typography.labelMedium)
+                    }
+                }
+            }
+            items(sorted, key = { it.id }) { s ->
+                val inPack = s.id in pack.stickerIds
+                val anim = s.id in vm.animatedIds
+                val otherType = !inPack && packType != null && anim != packType
                 val sel = s.id in chosen
                 Box(
                     Modifier
@@ -482,12 +533,28 @@ fun PickerScreen(vm: MainViewModel, pack: Pack, stickers: List<Sticker>) {
                         .clip(MaterialTheme.shapes.medium)
                         .background(if (sel) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainer)
                         .then(if (sel) Modifier.border(2.dp, MaterialTheme.colorScheme.primary, MaterialTheme.shapes.medium) else Modifier)
-                        .clickable {
-                            chosen = if (sel) chosen - s.id else if (chosen.size < room) chosen + s.id else chosen
+                        .clickable(enabled = !inPack) {
+                            when {
+                                sel -> chosen = chosen - s.id
+                                otherType -> vm.message = tr(
+                                    "No se mezclan animados y estáticos. Si este está mal marcado, ábrelo y cambia su tipo.",
+                                    "Animated and static can't be mixed. If this one is wrong, open it and change its type.",
+                                )
+                                else -> chosen = chosen + s.id
+                            }
                         },
                 ) {
-                    StickerImage(s, Modifier.fillMaxSize().padding(8.dp))
-                    if (sel) {
+                    StickerImage(
+                        s,
+                        Modifier
+                            .fillMaxSize()
+                            .padding(8.dp)
+                            .alpha(if (inPack) 0.3f else if (otherType) 0.45f else 1f),
+                    )
+                    if (anim) AnimatedBadge(Modifier.align(Alignment.TopStart).padding(4.dp))
+                    if (inPack) {
+                        Icon(Icons.Rounded.CheckCircle, tr("Ya en el paquete", "Already in pack"), tint = MaterialTheme.colorScheme.outline, modifier = Modifier.align(Alignment.TopEnd).padding(4.dp).size(20.dp))
+                    } else if (sel) {
                         Icon(Icons.Rounded.CheckCircle, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.align(Alignment.TopEnd).padding(4.dp).size(22.dp))
                     }
                 }

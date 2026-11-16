@@ -100,6 +100,65 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     var importProgress by mutableStateOf<Pair<Int, Int>?>(null)
         private set
 
+    /** Stickers marcados como animados (para mostrarlo y no mezclarlos en paquetes). */
+    var animatedIds by mutableStateOf<Set<String>>(emptySet())
+        private set
+
+    /** Stickers que no han cabido en un paquete (máx. 30): se ofrece crear otro con ellos. */
+    var overflow by mutableStateOf<Pair<String, List<String>>?>(null)
+        private set
+
+    /**
+     * Las versiones anteriores tomaban por animados stickers de WhatsApp de un solo fotograma.
+     * Se revisan, se pasan a estático (WebP normal + base para decorar) y se corrigen los paquetes.
+     */
+    private fun fixStaticMarkedAsAnimated() {
+        if (prefs.getBoolean("fix_anim_v1", false)) return
+        store.list().forEach { s ->
+            val meta = store.loadMeta(s)
+            if (!meta.animated) return@forEach
+            val bytes = runCatching { s.file.readBytes() }.getOrNull() ?: return@forEach
+            if (!WebpInfo.isAnimated(bytes)) runCatching { convertToStatic(s, bytes) }
+        }
+        packStore.recomputeTypes { id -> store.get(id)?.let { store.loadMeta(it).animated } ?: false }
+        prefs.edit().putBoolean("fix_anim_v1", true).apply()
+    }
+
+    /** Convierte un sticker en estático: primer fotograma como WebP normal y base para poder decorarlo. */
+    private fun convertToStatic(sticker: Sticker, bytes: ByteArray) {
+        val bmp = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.copy(Bitmap.Config.ARGB_8888, false) ?: return
+        val base = Images.fitTo512(bmp)
+        store.write(sticker, Images.encodeWebp(base), basePng = Images.encodePng(base))
+        store.saveMeta(sticker, store.loadMeta(sticker).copy(animated = false))
+    }
+
+    /** El usuario corrige el tipo de un sticker. */
+    fun setStickerType(sticker: Sticker, animated: Boolean) {
+        viewModelScope.launch {
+            val meta = withContext(Dispatchers.IO) {
+                if (!animated) {
+                    val bytes = runCatching { sticker.file.readBytes() }.getOrNull()
+                    if (bytes != null && WebpInfo.isAnimated(bytes)) {
+                        // Animación real que se quiere estática: se queda con el primer fotograma.
+                        convertToStatic(sticker, bytes)
+                    } else {
+                        store.saveMeta(sticker, store.loadMeta(sticker).copy(animated = false))
+                        if (!sticker.baseFile.exists() && bytes != null) convertToStatic(sticker, bytes)
+                    }
+                } else {
+                    store.saveMeta(sticker, store.loadMeta(sticker).copy(animated = true))
+                }
+                packStore.recomputeTypes { id -> store.get(id)?.let { store.loadMeta(it).animated } ?: false }
+                store.loadMeta(sticker)
+            }
+            viewingMeta = meta
+            viewing = store.get(sticker.id)
+            stickerChanged(sticker.id, deleted = false)
+            refresh()
+            message = if (animated) tr("Marcado como animado", "Marked as animated") else tr("Marcado como estático", "Marked as static")
+        }
+    }
+
     val lastPublisher: String get() = prefs.getString("publisher", null).orEmpty()
 
     private val _stickers = MutableStateFlow(store.list())
@@ -118,6 +177,13 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         private set
 
     private var job: Job? = null
+
+    init {
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) { fixStaticMarkedAsAnimated() }
+            refresh()
+        }
+    }
 
     // ---------- Nuevo sticker ----------
 
@@ -360,6 +426,9 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private suspend fun refresh() {
         _stickers.value = withContext(Dispatchers.IO) { store.list() }
         _packs.value = withContext(Dispatchers.IO) { packStore.list() }
+        animatedIds = withContext(Dispatchers.IO) {
+            _stickers.value.filter { store.loadMeta(it).animated }.map { it.id }.toSet()
+        }
     }
 
     private suspend fun stickerChanged(id: String, deleted: Boolean) {
@@ -451,26 +520,27 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    /** Añade stickers a un paquete respetando el máximo y el tipo (estático o animado). */
+    /** Añade stickers a un paquete respetando el máximo (30) y sin mezclar animados y estáticos. */
     fun addToPack(packId: String, ids: Collection<String>) {
         selection = emptySet()
         pickerPackId = null
         viewModelScope.launch {
             var skippedType = 0
-            var skippedFull = 0
             var added = 0
+            var rest: List<String> = emptyList()
             withContext(Dispatchers.IO) {
                 val pack = packStore.get(packId) ?: return@withContext
-                val types = ids.associateWith { id -> store.get(id)?.let { store.loadMeta(it).animated } }
-                val valid = ids.filter { it !in pack.stickerIds && types[it] != null }
-                val animated = if (pack.stickerIds.isEmpty()) (valid.firstOrNull()?.let { types[it] } ?: false) else pack.animated
-                val sameType = valid.filter { types[it] == animated }
+                fun isAnim(id: String) = store.get(id)?.let { store.loadMeta(it).animated }
+                val valid = ids.filter { it !in pack.stickerIds && isAnim(it) != null }
+                // El tipo lo deciden los stickers que ya tiene el paquete (o el primero que se añade).
+                val packType = pack.stickerIds.firstOrNull()?.let { isAnim(it) } ?: valid.firstOrNull()?.let { isAnim(it) } ?: false
+                val sameType = valid.filter { isAnim(it) == packType }
                 skippedType = valid.size - sameType.size
-                val room = Pack.MAX_STICKERS - pack.count
-                val toAdd = sameType.take(room.coerceAtLeast(0))
-                skippedFull = sameType.size - toAdd.size
+                val room = (Pack.MAX_STICKERS - pack.count).coerceAtLeast(0)
+                val toAdd = sameType.take(room)
+                rest = sameType.drop(room)
                 added = toAdd.size
-                packStore.update(packId) { it.copy(stickerIds = it.stickerIds + toAdd, animated = animated) }
+                packStore.update(packId) { it.copy(stickerIds = it.stickerIds + toAdd, animated = packType) }
             }
             WhatsApp.notifyChanged(getApplication())
             refresh()
@@ -478,10 +548,34 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             openPack(packId)
             message = buildString {
                 append(tr("$added añadidos", "$added added"))
-                if (skippedType > 0) append(tr(" · $skippedType no encajan (no se mezclan animados y estáticos)", " · $skippedType don't fit (animated and static can't be mixed)"))
-                if (skippedFull > 0) append(tr(" · $skippedFull no caben (máximo ${Pack.MAX_STICKERS})", " · $skippedFull don't fit (max ${Pack.MAX_STICKERS})"))
+                if (skippedType > 0) append(
+                    tr(
+                        " · $skippedType son de otro tipo (animado/estático). Si alguno está mal marcado, cámbialo desde el sticker.",
+                        " · $skippedType are of the other type (animated/static). If one is wrong, change it from the sticker.",
+                    )
+                )
             }
+            if (rest.isNotEmpty()) overflow = packId to rest
         }
+    }
+
+    /** Crea un paquete de continuación con los stickers que no cupieron. */
+    fun acceptOverflow() {
+        val (packId, rest) = overflow ?: return
+        overflow = null
+        val pack = _packs.value.firstOrNull { it.id == packId } ?: return
+        createPack(nextPackName(pack.name), pack.publisher, rest)
+    }
+
+    fun dismissOverflow() { overflow = null }
+
+    private fun nextPackName(name: String): String {
+        val m = Regex("^(.*) (\\d+)$").find(name)
+        val (stem, n) = if (m != null) m.groupValues[1] to (m.groupValues[2].toInt() + 1) else name to 2
+        var candidate = "$stem $n"
+        var k = n
+        while (_packs.value.any { it.name == candidate }) { k++; candidate = "$stem $k" }
+        return candidate
     }
 
     fun removeFromPack(packId: String, stickerId: String) {

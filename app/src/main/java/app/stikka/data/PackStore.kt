@@ -108,6 +108,14 @@ class PackStore(context: Context, private val stickers: StickerStore) {
         }
     }
 
+    /** Marca cada paquete como animado si contiene algún sticker animado. */
+    @Synchronized
+    fun recomputeTypes(isAnimated: (String) -> Boolean) {
+        val packs = list()
+        val fixed = packs.map { p -> p.copy(animated = p.stickerIds.any(isAnimated)) }
+        if (fixed != packs) saveAll(fixed.map { f -> if (packs.first { it.id == f.id }.animated != f.animated) f.copy(version = f.version + 1) else f })
+    }
+
     fun trayFile(pack: Pack): File = File(File(trayRoot, pack.id), "tray.png")
 
     /** Icono de bandeja: 96x96 PNG de menos de 50 KB, sacado del sticker elegido. */
