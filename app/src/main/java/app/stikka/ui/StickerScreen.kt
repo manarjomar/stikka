@@ -49,7 +49,15 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import app.stikka.data.Pack
 import app.stikka.data.Sticker
+import app.stikka.data.StickerMeta
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.automirrored.rounded.PlaylistAdd
+import androidx.compose.ui.unit.sp
 import app.stikka.domain.tr
 import java.text.DateFormat
 import java.util.Date
@@ -64,8 +72,16 @@ fun StickerScreen(
     onDelete: (Sticker) -> Unit,
     onEdit: (Sticker) -> Unit,
     onDecorate: (Sticker) -> Unit,
+    meta: StickerMeta,
+    packs: List<Pack>,
+    onEmojis: (List<String>) -> Unit,
+    onAddToPack: (Pack) -> Unit,
+    onNewPack: () -> Unit,
 ) {
     var confirm by remember { mutableStateOf(false) }
+    var emojiPicker by remember { mutableStateOf(false) }
+    var packSheet by remember { mutableStateOf(false) }
+    val inPacks = packs.filter { sticker.id in it.stickerIds }
 
     Scaffold(
         topBar = {
@@ -102,7 +118,11 @@ fun StickerScreen(
                     .checkerboard(),
                 contentAlignment = Alignment.Center,
             ) {
-                StickerImage(sticker, Modifier.fillMaxSize().padding(12.dp))
+                if (meta.animated) {
+                    AnimatedSticker(sticker, Modifier.fillMaxSize().padding(12.dp))
+                } else {
+                    StickerImage(sticker, Modifier.fillMaxSize().padding(12.dp))
+                }
             }
             Spacer(Modifier.height(16.dp))
             Surface(
@@ -140,10 +160,54 @@ fun StickerScreen(
                         Text(tr("Recorte", "Cutout"))
                     }
                 }
-                FilledTonalButton(onClick = { onDecorate(sticker) }, modifier = Modifier.weight(1f).height(52.dp)) {
-                    Icon(Icons.Rounded.EmojiEmotions, null, Modifier.size(20.dp))
-                    Spacer(Modifier.width(8.dp))
-                    Text(tr("Decorar", "Decorate"))
+                if (!meta.animated) {
+                    FilledTonalButton(onClick = { onDecorate(sticker) }, modifier = Modifier.weight(1f).height(52.dp)) {
+                        Icon(Icons.Rounded.EmojiEmotions, null, Modifier.size(20.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text(tr("Decorar", "Decorate"))
+                    }
+                }
+            }
+            Spacer(Modifier.height(10.dp))
+            FilledTonalButton(onClick = { packSheet = true }, modifier = Modifier.fillMaxWidth().height(52.dp)) {
+                Icon(Icons.AutoMirrored.Rounded.PlaylistAdd, null, Modifier.size(20.dp))
+                Spacer(Modifier.width(8.dp))
+                Text(tr("Añadir a un paquete", "Add to a pack"))
+            }
+            Spacer(Modifier.height(16.dp))
+            Surface(
+                color = MaterialTheme.colorScheme.surfaceContainerLow,
+                shape = MaterialTheme.shapes.medium,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Column(Modifier.padding(16.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text(tr("Emojis para WhatsApp", "Emojis for WhatsApp"), style = MaterialTheme.typography.titleMedium)
+                            Text(
+                                tr("WhatsApp los usa para sugerir el sticker (1 a 3)", "WhatsApp uses them to suggest the sticker (1 to 3)"),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        TextButton(onClick = { emojiPicker = true }) { Text(tr("Cambiar", "Change")) }
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        meta.whatsappEmojis.forEach { e ->
+                            Surface(shape = CircleShape, color = MaterialTheme.colorScheme.surfaceContainerHighest) {
+                                Text(e, fontSize = 24.sp, modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp))
+                            }
+                        }
+                    }
+                    if (inPacks.isNotEmpty()) {
+                        Spacer(Modifier.height(12.dp))
+                        Text(
+                            tr("En: ", "In: ") + inPacks.joinToString { it.name },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                 }
             }
             Spacer(Modifier.height(10.dp))
@@ -152,17 +216,24 @@ fun StickerScreen(
                 Spacer(Modifier.width(10.dp))
                 Text(tr("Eliminar", "Delete"))
             }
-            Spacer(Modifier.height(16.dp))
-            Text(
-                tr(
-                    "Próximamente: paquetes para añadir a WhatsApp e importar tus stickers de WhatsApp.",
-                    "Coming soon: packs to add to WhatsApp and importing your WhatsApp stickers.",
-                ),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
             Spacer(Modifier.height(24.dp))
         }
+    }
+
+    if (emojiPicker) {
+        EmojiTagsSheet(
+            initial = meta.emojis,
+            onDismiss = { emojiPicker = false },
+            onSave = { emojiPicker = false; onEmojis(it) },
+        )
+    }
+    if (packSheet) {
+        PackPickerSheet(
+            packs = packs.filter { sticker.id !in it.stickerIds },
+            onDismiss = { packSheet = false },
+            onPick = { packSheet = false; onAddToPack(it) },
+            onNew = { packSheet = false; onNewPack() },
+        )
     }
 
     if (confirm) {
@@ -196,5 +267,70 @@ private fun InfoRow(icon: ImageVector, label: String, value: String) {
         Spacer(Modifier.width(14.dp))
         Text(label, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
         Text(value, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+/** Muestra un sticker animado moviéndose. */
+@Composable
+fun AnimatedSticker(sticker: Sticker, modifier: Modifier = Modifier) {
+    androidx.compose.ui.viewinterop.AndroidView(
+        factory = { ctx ->
+            android.widget.ImageView(ctx).apply { scaleType = android.widget.ImageView.ScaleType.FIT_CENTER }
+        },
+        update = { view ->
+            runCatching {
+                val d = android.graphics.ImageDecoder.decodeDrawable(android.graphics.ImageDecoder.createSource(sticker.file))
+                view.setImageDrawable(d)
+                (d as? android.graphics.drawable.AnimatedImageDrawable)?.start()
+            }
+        },
+        modifier = modifier,
+    )
+}
+
+/** Elegir de 1 a 3 emojis para que WhatsApp sugiera el sticker. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun EmojiTagsSheet(initial: List<String>, onDismiss: () -> Unit, onSave: (List<String>) -> Unit) {
+    var chosen by remember { mutableStateOf(initial.take(3)) }
+    androidx.compose.material3.ModalBottomSheet(onDismissRequest = onDismiss) {
+        Column(Modifier.padding(horizontal = 16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(tr("Emojis del sticker", "Sticker emojis"), style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
+                Button(onClick = { onSave(chosen) }, enabled = chosen.isNotEmpty()) { Text(tr("Guardar", "Save")) }
+            }
+            Spacer(Modifier.height(8.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.height(48.dp)) {
+                if (chosen.isEmpty()) {
+                    Text(tr("Elige hasta 3", "Pick up to 3"), color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.align(Alignment.CenterVertically))
+                }
+                chosen.forEach { e ->
+                    Surface(onClick = { chosen = chosen - e }, shape = CircleShape, color = MaterialTheme.colorScheme.primaryContainer) {
+                        Text("$e  ✕", fontSize = 20.sp, modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp))
+                    }
+                }
+            }
+            Spacer(Modifier.height(8.dp))
+            androidx.compose.foundation.lazy.grid.LazyVerticalGrid(
+                columns = androidx.compose.foundation.lazy.grid.GridCells.Adaptive(52.dp),
+                modifier = Modifier.fillMaxWidth().height(380.dp),
+            ) {
+                items(EmojiList.size) { i ->
+                    val e = EmojiList[i]
+                    val sel = e in chosen
+                    Box(
+                        Modifier
+                            .size(52.dp)
+                            .clip(MaterialTheme.shapes.small)
+                            .then(if (sel) Modifier.background(MaterialTheme.colorScheme.primaryContainer) else Modifier)
+                            .clickable {
+                                chosen = if (sel) chosen - e else if (chosen.size < 3) chosen + e else chosen
+                            },
+                        contentAlignment = Alignment.Center,
+                    ) { Text(e, fontSize = 28.sp) }
+                }
+            }
+            Spacer(Modifier.navigationBarsPadding().height(16.dp))
+        }
     }
 }

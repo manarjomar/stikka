@@ -24,6 +24,7 @@ data class Sticker(
     val decorFile: File get() = File(dir, "decor.json")
     val sourceFile: File get() = File(dir, "source.jpg")
     val maskFile: File get() = File(dir, "mask.png")
+    val metaFile: File get() = File(dir, "meta.json")
     val created: Long get() = id.substringBefore('-').toLongOrNull() ?: dir.lastModified()
     val sizeBytes: Long get() = file.length()
     /** Se puede retocar el recorte si guardamos la foto original y la máscara. */
@@ -45,18 +46,20 @@ class StickerStore(context: Context) {
 
     fun save(
         webp: ByteArray,
-        basePng: ByteArray,
+        basePng: ByteArray?,
         decorJson: String,
         sourceJpeg: ByteArray? = null,
         maskPng: ByteArray? = null,
+        meta: StickerMeta = StickerMeta(),
     ): Sticker {
         val id = "${System.currentTimeMillis()}-${(1000..9999).random()}"
         val dir = File(root, id).apply { mkdirs() }
         val sticker = Sticker(id, dir)
         sourceJpeg?.let { sticker.sourceFile.writeBytes(it) }
         maskPng?.let { sticker.maskFile.writeBytes(it) }
-        sticker.baseFile.writeBytes(basePng)
+        basePng?.let { sticker.baseFile.writeBytes(it) }
         sticker.decorFile.writeText(decorJson)
+        sticker.metaFile.writeText(meta.toJson())
         // El sticker se escribe el último: si algo falla antes, no aparece en la lista.
         sticker.file.writeBytes(webp)
         return sticker
@@ -88,7 +91,50 @@ class StickerStore(context: Context) {
         return BitmapFactory.decodeFile(f.absolutePath, opts)
     }
 
+    fun loadMeta(sticker: Sticker): StickerMeta =
+        StickerMeta.fromJson(runCatching { sticker.metaFile.readText() }.getOrNull())
+
+    fun saveMeta(sticker: Sticker, meta: StickerMeta) {
+        sticker.metaFile.writeText(meta.toJson())
+    }
+
+    /** Nombres de archivo de WhatsApp ya importados, para no repetirlos. */
+    fun importedOrigins(): Set<String> =
+        list().mapNotNull { loadMeta(it).origin }.toSet()
+
     fun delete(sticker: Sticker) {
         sticker.dir.deleteRecursively()
+    }
+}
+
+/** Datos extra de un sticker: emojis para WhatsApp, si es animado y de dónde viene. */
+data class StickerMeta(
+    val emojis: List<String> = emptyList(),
+    val animated: Boolean = false,
+    /** Nombre del archivo original si se importó desde WhatsApp. */
+    val origin: String? = null,
+) {
+    fun toJson(): String = org.json.JSONObject()
+        .put("emojis", org.json.JSONArray(emojis))
+        .put("animated", animated)
+        .apply { origin?.let { put("origin", it) } }
+        .toString()
+
+    /** WhatsApp exige al menos un emoji por sticker (máximo tres). */
+    val whatsappEmojis: List<String> get() = emojis.take(3).ifEmpty { listOf("😀") }
+
+    companion object {
+        fun fromJson(json: String?): StickerMeta {
+            if (json.isNullOrBlank()) return StickerMeta()
+            return runCatching {
+                val o = org.json.JSONObject(json)
+                val arr = o.optJSONArray("emojis") ?: org.json.JSONArray()
+                StickerMeta(
+                    emojis = (0 until arr.length()).map { arr.getString(it) },
+                    animated = o.optBoolean("animated", false),
+                    origin = o.optString("origin").ifBlank { null },
+                )
+            }.getOrDefault(StickerMeta())
+        }
     }
 }

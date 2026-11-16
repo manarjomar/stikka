@@ -79,6 +79,18 @@ object Images {
         return out
     }
 
+    /** Encaja cualquier imagen en el lienzo de 512 px sin márgenes (para stickers importados). */
+    fun fitTo512(src: Bitmap): Bitmap {
+        if (src.width == StickerSpec.SIZE && src.height == StickerSpec.SIZE && src.config == Bitmap.Config.ARGB_8888) return src
+        val fit = StickerMath.fitInto(src.width, src.height, StickerSpec.SIZE, 0)
+        val out = Bitmap.createBitmap(StickerSpec.SIZE, StickerSpec.SIZE, Bitmap.Config.ARGB_8888)
+        Canvas(out).drawBitmap(
+            src, null, RectF(fit.left, fit.top, fit.left + fit.width, fit.top + fit.height),
+            Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG),
+        )
+        return out
+    }
+
     /** WebP con transparencia por debajo del límite de WhatsApp (100 KB). */
     fun encodeWebp(bitmap: Bitmap, maxBytes: Int = StickerSpec.MAX_BYTES): ByteArray {
         val format = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {

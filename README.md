@@ -30,7 +30,7 @@
 | **0.1** | Import → automatic cutout → save ✅ |
 | **0.2** | Cutout editor: brush, lasso, rectangle/square, zoom, magnifier, undo ✅ |
 | **0.3** | Text and emojis (movable, editable), outline ✅ |
-| 0.4 | Sticker packs + **Add to WhatsApp** + import from WhatsApp |
+| **0.4** | Sticker packs + **Add to WhatsApp** + import from WhatsApp ✅ |
 | 1.0 | Polish, themes, more languages |
 | Later | Animated stickers from GIF/video |
 
@@ -54,7 +54,7 @@ Download `Stikka-X.Y.apk` from [Releases](https://github.com/manarjomar/stikka/r
 | **0.1** | Importar → recorte automático → guardar ✅ |
 | **0.2** | Editor de recorte: pincel, lazo, rectángulo/cuadrado, zoom, lupa, deshacer ✅ |
 | **0.3** | Textos y emojis (movibles y editables), borde ✅ |
-| 0.4 | Paquetes + **Añadir a WhatsApp** + importar desde WhatsApp |
+| **0.4** | Paquetes + **Añadir a WhatsApp** + importar desde WhatsApp ✅ |
 | 1.0 | Pulido, temas, más idiomas |
 | Después | Stickers animados desde GIF o vídeo |
 

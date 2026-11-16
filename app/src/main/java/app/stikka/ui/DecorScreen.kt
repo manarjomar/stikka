@@ -93,16 +93,6 @@ private val TextColors = listOf(
 
 private val OutlineColors = listOf(0xFFFFFFFF, 0xFF000000, 0xFFE0336F, 0xFFFFD54F, 0xFF29B6F6).map { it.toInt() }
 
-private val Emojis = (
-    "😀 😃 😄 😁 😆 😅 🤣 😂 🙂 😉 😊 😇 🥰 😍 🤩 😘 😋 😛 😜 🤪 😝 🤑 🤗 🤭 🤫 🤔 🤐 🤨 😐 😏 " +
-        "😒 🙄 😬 😌 😔 😪 🤤 😴 😷 🤒 🤕 🤢 🤮 🥵 🥶 🥴 😵 🤯 🤠 🥳 😎 🤓 🧐 😕 😟 🙁 😮 😲 😳 🥺 " +
-        "😦 😨 😰 😥 😢 😭 😱 😖 😣 😞 😓 😩 😫 🥱 😤 😡 😠 🤬 😈 👿 💀 💩 🤡 👻 👽 🤖 😺 😹 😻 🙈 " +
-        "🙉 🙊 💋 💌 💘 💝 💖 💗 💓 💞 💕 ❤️ 🧡 💛 💚 💙 💜 🖤 🤍 💔 ❣️ 💯 💢 💥 💫 💦 💨 💬 💤 👋 " +
-        "👌 ✌️ 🤞 🤟 🤘 🤙 👈 👉 👆 👇 👍 👎 ✊ 👊 👏 🙌 👐 🙏 💪 🫶 👀 🧠 🔥 ⭐ 🌟 ✨ ⚡ 🌈 ☀️ 🌙 " +
-        "🎉 🎊 🎈 🎁 🎂 🏆 🥇 ⚽ 🏀 🎮 🎵 🎶 🍕 🍔 🍟 🌮 🍿 🍩 🍪 🍫 🍺 🍻 🥂 🍷 ☕ 🐶 🐱 🐭 🐰 🦊 " +
-        "🐻 🐼 🐨 🐯 🦁 🐮 🐷 🐸 🐵 🐔 🐧 🦄 🐝 🦋 🌹 🌻 🌸 🍀 ✅ ❌ ❓ ❗ 🆗 🆒 🆕 🔝 📍 📸 💰 🚀"
-    ).split(' ').filter { it.isNotBlank() }
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DecorScreen(
@@ -463,7 +453,7 @@ private fun EmojiSheet(onDismiss: () -> Unit, onPick: (String) -> Unit) {
                 columns = GridCells.Adaptive(52.dp),
                 modifier = Modifier.fillMaxWidth().height(380.dp),
             ) {
-                items(Emojis) { e ->
+                items(EmojiList) { e ->
                     Box(
                         Modifier
                             .size(52.dp)

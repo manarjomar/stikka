@@ -93,3 +93,15 @@ fun Modifier.pulse(): Modifier {
     )
     return this.scale(s)
 }
+
+/** Emojis frecuentes para decorar y para etiquetar stickers. */
+val EmojiList: List<String> = (
+    "😀 😃 😄 😁 😆 😅 🤣 😂 🙂 😉 😊 😇 🥰 😍 🤩 😘 😋 😛 😜 🤪 😝 🤑 🤗 🤭 🤫 🤔 🤐 🤨 😐 😏 " +
+        "😒 🙄 😬 😌 😔 😪 🤤 😴 😷 🤒 🤕 🤢 🤮 🥵 🥶 🥴 😵 🤯 🤠 🥳 😎 🤓 🧐 😕 😟 🙁 😮 😲 😳 🥺 " +
+        "😦 😨 😰 😥 😢 😭 😱 😖 😣 😞 😓 😩 😫 🥱 😤 😡 😠 🤬 😈 👿 💀 💩 🤡 👻 👽 🤖 😺 😹 😻 🙈 " +
+        "🙉 🙊 💋 💌 💘 💝 💖 💗 💓 💞 💕 ❤️ 🧡 💛 💚 💙 💜 🖤 🤍 💔 ❣️ 💯 💢 💥 💫 💦 💨 💬 💤 👋 " +
+        "👌 ✌️ 🤞 🤟 🤘 🤙 👈 👉 👆 👇 👍 👎 ✊ 👊 👏 🙌 👐 🙏 💪 🫶 👀 🧠 🔥 ⭐ 🌟 ✨ ⚡ 🌈 ☀️ 🌙 " +
+        "🎉 🎊 🎈 🎁 🎂 🏆 🥇 ⚽ 🏀 🎮 🎵 🎶 🍕 🍔 🍟 🌮 🍿 🍩 🍪 🍫 🍺 🍻 🥂 🍷 ☕ 🐶 🐱 🐭 🐰 🦊 " +
+        "🐻 🐼 🐨 🐯 🦁 🐮 🐷 🐸 🐵 🐔 🐧 🦄 🐝 🦋 🌹 🌻 🌸 🍀 ✅ ❌ ❓ ❗ 🆗 🆒 🆕 🔝 📍 📸 💰 🚀"
+    ).split(' ').filter { it.isNotBlank() }
+

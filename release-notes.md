@@ -1,19 +1,19 @@
-**Stikka 0.3** — text, emojis and outline · textos, emojis y borde
+**Stikka 0.4** — packs and WhatsApp · paquetes y WhatsApp
 
 🇬🇧
-- New **Decorate** screen, when creating a sticker or on any saved one:
-  - **Text** with 12 colours, 5 fonts and an optional contour so it reads on any background.
-  - **Emojis**: pick from the grid or type any emoji.
-  - Drag to move, **two fingers to rotate and resize**, plus size and rotation sliders. Duplicate, bring to front or delete.
-  - **Outline** around the cutout (white, black or colour) with adjustable width.
-- Everything stays **editable**: reopen any sticker to change its text, emojis, outline or cutout, and it's updated.
+- **Sticker packs**: create packs with name and author, add 3 to 30 stickers, choose the pack icon, reorder by removing and adding, rename or delete.
+- **Add to WhatsApp** with one tap (WhatsApp and WhatsApp Business). Packs you've already added show “In WhatsApp”, and any change you make — editing a sticker, adding or removing — is picked up by WhatsApp automatically.
+- **Emojis for WhatsApp** on each sticker (1 to 3), so WhatsApp can suggest it.
+- **Import from WhatsApp**: pick the “WhatsApp Stickers” folder once and bring in the stickers from your chats (static and animated), skipping the ones already imported.
+- **Multi-select** in your library (long-press): add many stickers to a pack at once or delete them.
+- New bottom bar: Stickers · Packs.
 
 🇪🇸
-- Nueva pantalla **Decorar**, al crear un sticker o sobre cualquiera ya guardado:
-  - **Textos** con 12 colores, 5 tipos de letra y contorno opcional para que se lean sobre cualquier fondo.
-  - **Emojis**: elígelos de la cuadrícula o escribe el que quieras.
-  - Arrastra para mover y usa **dos dedos para girar y escalar**; también hay controles de tamaño y giro. Duplicar, traer delante o eliminar.
-  - **Borde** alrededor del recorte (blanco, negro o de color) con grosor ajustable.
-- Todo queda **editable**: vuelve a abrir cualquier sticker para cambiar textos, emojis, borde o recorte, y se actualiza.
+- **Paquetes de stickers**: crea paquetes con nombre y autor, añade de 3 a 30 stickers, elige el icono, cambia el nombre o elimínalos.
+- **Añadir a WhatsApp** con un toque (WhatsApp y WhatsApp Business). Los paquetes ya añadidos aparecen como «En WhatsApp», y cualquier cambio (retocar un sticker, añadir o quitar) le llega a WhatsApp solo.
+- **Emojis para WhatsApp** en cada sticker (de 1 a 3), para que WhatsApp lo sugiera.
+- **Importar de WhatsApp**: elige una vez la carpeta «WhatsApp Stickers» y trae los stickers de tus chats (estáticos y animados), sin repetir los ya importados.
+- **Selección múltiple** en la biblioteca (pulsación larga): añade muchos stickers a un paquete a la vez o elimínalos.
+- Nueva barra inferior: Stickers · Paquetes.
 
 Download the `.apk` file under **Assets** · Descarga el archivo `.apk` en **Assets**.

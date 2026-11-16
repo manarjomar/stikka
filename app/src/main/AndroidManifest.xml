@@ -1,6 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <!-- Para saber si WhatsApp está instalada y si ya tiene nuestros paquetes. -->
+    <queries>
+        <package android:name="com.whatsapp" />
+        <package android:name="com.whatsapp.w4b" />
+    </queries>
+
     <application
         android:name=".StikkaApp"
         android:allowBackup="true"
@@ -35,6 +41,14 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/file_paths" />
         </provider>
+
+        <!-- Paquetes de stickers para WhatsApp (formato de la app de ejemplo oficial). -->
+        <provider
+            android:name=".data.StickerProvider"
+            android:authorities="${applicationId}.stickercontentprovider"
+            android:enabled="true"
+            android:exported="true"
+            android:readPermission="com.whatsapp.sticker.READ" />
 
         <!-- Modelo de recorte de Google Play Services (además se pide en el primer uso). -->
         <meta-data

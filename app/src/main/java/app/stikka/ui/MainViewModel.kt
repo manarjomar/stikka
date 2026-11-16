@@ -10,7 +10,15 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import app.stikka.StikkaApp
+import android.content.Context
+import android.content.Intent
+import app.stikka.data.Pack
 import app.stikka.data.Sticker
+import app.stikka.data.StickerMeta
+import app.stikka.data.WaFile
+import app.stikka.data.WhatsAppImport
+import app.stikka.domain.WebpInfo
+import app.stikka.domain.WhatsApp
 import app.stikka.domain.Cutout
 import app.stikka.domain.Decor
 import app.stikka.domain.DecorEditor
@@ -52,6 +60,47 @@ sealed interface CutState {
 
 class MainViewModel(app: Application) : AndroidViewModel(app) {
     private val store = StikkaApp.instance.store
+    private val packStore = StikkaApp.instance.packs
+    private val prefs = app.getSharedPreferences("settings", Context.MODE_PRIVATE)
+
+    private val _packs = MutableStateFlow(packStore.list())
+    val packs: StateFlow<List<Pack>> = _packs
+
+    /** Pestaña de inicio: 0 = stickers, 1 = paquetes. */
+    var tab by mutableStateOf(0)
+    /** Stickers seleccionados con pulsación larga. */
+    var selection by mutableStateOf<Set<String>>(emptySet())
+        private set
+    var openPackId by mutableStateOf<String?>(null)
+        private set
+    /** Paquete al que se están añadiendo stickers (pantalla de selección). */
+    var pickerPackId by mutableStateOf<String?>(null)
+        private set
+    /** ¿Está cada paquete añadido en WhatsApp? (null = no se sabe) */
+    var addedStatus by mutableStateOf<Map<String, Boolean?>>(emptyMap())
+        private set
+    var whatsappInstalled by mutableStateOf(true)
+        private set
+    var viewingMeta by mutableStateOf(StickerMeta())
+        private set
+
+    // Importación desde WhatsApp
+    var importOpen by mutableStateOf(false)
+        private set
+    var importTree by mutableStateOf(prefs.getString("wa_tree", null)?.let { Uri.parse(it) })
+        private set
+    var importFiles by mutableStateOf<List<WaFile>?>(null)
+        private set
+    var importLoading by mutableStateOf(false)
+        private set
+    var importSelected by mutableStateOf<Set<String>>(emptySet())
+        private set
+    var importedOrigins by mutableStateOf<Set<String>>(emptySet())
+        private set
+    var importProgress by mutableStateOf<Pair<Int, Int>?>(null)
+        private set
+
+    val lastPublisher: String get() = prefs.getString("publisher", null).orEmpty()
 
     private val _stickers = MutableStateFlow(store.list())
     val stickers: StateFlow<List<Sticker>> = _stickers
@@ -203,6 +252,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 done = { editor = null },
             ) {
                 val sticker = store.get(t.stickerId) ?: return@persist
+                changedStickerId = sticker.id
                 val base = Images.renderSticker(Images.applyMask(e.source, mask), mask)
                 val decor = store.loadDecor(sticker)
                 store.write(
@@ -256,6 +306,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 done = { decorator = null },
             ) {
                 val sticker = store.get(t.stickerId) ?: return@persist
+                changedStickerId = sticker.id
                 store.write(
                     sticker,
                     webp = Images.encodeWebp(DecorRenderer.render(d.base, decor)),
@@ -266,12 +317,16 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    private var changedStickerId: String? = null
+
     /** Guarda cambios de un sticker existente en segundo plano y refresca la vista. */
     private fun persist(ok: String, done: () -> Unit, work: suspend () -> Unit) {
         saving = true
         viewModelScope.launch {
             try {
                 withContext(Dispatchers.Default) { work() }
+                changedStickerId?.let { stickerChanged(it, deleted = false) }
+                changedStickerId = null
                 refresh()
                 viewing = viewing?.let { store.get(it.id) }
                 done()
@@ -286,13 +341,17 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     // ---------- Biblioteca ----------
 
-    fun open(sticker: Sticker) { viewing = sticker }
+    fun open(sticker: Sticker) {
+        viewing = sticker
+        viewingMeta = store.loadMeta(sticker)
+    }
     fun closeViewer() { viewing = null }
 
     fun delete(sticker: Sticker) {
         viewModelScope.launch {
             withContext(Dispatchers.IO) { store.delete(sticker) }
             if (viewing?.id == sticker.id) viewing = null
+            stickerChanged(sticker.id, deleted = true)
             refresh()
             message = tr("Sticker eliminado", "Sticker deleted")
         }
@@ -300,5 +359,268 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     private suspend fun refresh() {
         _stickers.value = withContext(Dispatchers.IO) { store.list() }
+        _packs.value = withContext(Dispatchers.IO) { packStore.list() }
+    }
+
+    private suspend fun stickerChanged(id: String, deleted: Boolean) {
+        withContext(Dispatchers.IO) { packStore.onStickerChanged(id, deleted) }
+        WhatsApp.notifyChanged(getApplication())
+    }
+
+    // ---------- Selección múltiple ----------
+
+    fun toggleSelect(id: String) {
+        selection = if (id in selection) selection - id else selection + id
+    }
+
+    fun clearSelection() { selection = emptySet() }
+
+    fun deleteSelected() {
+        val ids = selection
+        selection = emptySet()
+        viewModelScope.launch {
+            ids.forEach { id ->
+                withContext(Dispatchers.IO) { store.get(id)?.let { store.delete(it) } }
+                stickerChanged(id, deleted = true)
+            }
+            refresh()
+            message = tr("${ids.size} stickers eliminados", "${ids.size} stickers deleted")
+        }
+    }
+
+    // ---------- Emojis para WhatsApp ----------
+
+    fun setEmojis(sticker: Sticker, emojis: List<String>) {
+        viewModelScope.launch {
+            val meta = withContext(Dispatchers.IO) {
+                val m = store.loadMeta(sticker).copy(emojis = emojis.take(3))
+                store.saveMeta(sticker, m)
+                m
+            }
+            viewingMeta = meta
+            stickerChanged(sticker.id, deleted = false)
+            refresh()
+        }
+    }
+
+    // ---------- Paquetes ----------
+
+    fun openPack(id: String) {
+        openPackId = id
+        refreshAdded()
+    }
+
+    fun closePack() { openPackId = null }
+
+    /** Crea un paquete (opcionalmente con stickers) y lo abre. */
+    fun createPack(name: String, publisher: String, stickerIds: Collection<String> = emptyList()) {
+        if (_packs.value.size >= Pack.MAX_PACKS) {
+            message = tr("WhatsApp admite como máximo ${Pack.MAX_PACKS} paquetes por app", "WhatsApp allows up to ${Pack.MAX_PACKS} packs per app")
+            return
+        }
+        prefs.edit().putString("publisher", publisher).apply()
+        viewModelScope.launch {
+            val pack = withContext(Dispatchers.IO) { packStore.create(name.trim(), publisher.trim()) }
+            refresh()
+            if (stickerIds.isNotEmpty()) addToPack(pack.id, stickerIds) else {
+                tab = 1
+                openPack(pack.id)
+            }
+        }
+    }
+
+    fun renamePack(id: String, name: String, publisher: String) {
+        prefs.edit().putString("publisher", publisher).apply()
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) { packStore.update(id) { it.copy(name = name.trim().take(128), publisher = publisher.trim().take(128)) } }
+            WhatsApp.notifyChanged(getApplication())
+            refresh()
+        }
+    }
+
+    fun deletePack(id: String) {
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) { packStore.delete(id) }
+            if (openPackId == id) openPackId = null
+            WhatsApp.notifyChanged(getApplication())
+            refresh()
+            message = tr(
+                "Paquete eliminado. Si estaba en WhatsApp, quítalo también desde allí.",
+                "Pack deleted. If it was in WhatsApp, remove it there too.",
+            )
+        }
+    }
+
+    /** Añade stickers a un paquete respetando el máximo y el tipo (estático o animado). */
+    fun addToPack(packId: String, ids: Collection<String>) {
+        selection = emptySet()
+        pickerPackId = null
+        viewModelScope.launch {
+            var skippedType = 0
+            var skippedFull = 0
+            var added = 0
+            withContext(Dispatchers.IO) {
+                val pack = packStore.get(packId) ?: return@withContext
+                val types = ids.associateWith { id -> store.get(id)?.let { store.loadMeta(it).animated } }
+                val valid = ids.filter { it !in pack.stickerIds && types[it] != null }
+                val animated = if (pack.stickerIds.isEmpty()) (valid.firstOrNull()?.let { types[it] } ?: false) else pack.animated
+                val sameType = valid.filter { types[it] == animated }
+                skippedType = valid.size - sameType.size
+                val room = Pack.MAX_STICKERS - pack.count
+                val toAdd = sameType.take(room.coerceAtLeast(0))
+                skippedFull = sameType.size - toAdd.size
+                added = toAdd.size
+                packStore.update(packId) { it.copy(stickerIds = it.stickerIds + toAdd, animated = animated) }
+            }
+            WhatsApp.notifyChanged(getApplication())
+            refresh()
+            tab = 1
+            openPack(packId)
+            message = buildString {
+                append(tr("$added añadidos", "$added added"))
+                if (skippedType > 0) append(tr(" · $skippedType no encajan (no se mezclan animados y estáticos)", " · $skippedType don't fit (animated and static can't be mixed)"))
+                if (skippedFull > 0) append(tr(" · $skippedFull no caben (máximo ${Pack.MAX_STICKERS})", " · $skippedFull don't fit (max ${Pack.MAX_STICKERS})"))
+            }
+        }
+    }
+
+    fun removeFromPack(packId: String, stickerId: String) {
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) { packStore.update(packId) { it.copy(stickerIds = it.stickerIds - stickerId) } }
+            WhatsApp.notifyChanged(getApplication())
+            refresh()
+        }
+    }
+
+    fun setTray(packId: String, stickerId: String) {
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) { packStore.update(packId) { it.copy(trayId = stickerId) } }
+            WhatsApp.notifyChanged(getApplication())
+            refresh()
+            message = tr("Icono del paquete cambiado", "Pack icon changed")
+        }
+    }
+
+    fun openPicker(packId: String) { pickerPackId = packId }
+    fun closePicker() { pickerPackId = null }
+
+    /** Comprueba qué paquetes están ya en WhatsApp. */
+    fun refreshAdded() {
+        viewModelScope.launch {
+            val ctx: Context = getApplication()
+            val result = withContext(Dispatchers.IO) {
+                whatsappInstalled = WhatsApp.installed(ctx).isNotEmpty()
+                _packs.value.associate { it.id to WhatsApp.isAdded(ctx, it.id) }
+            }
+            addedStatus = result
+        }
+    }
+
+    /** Prepara el intent para añadir el paquete a WhatsApp (null si no se puede). */
+    fun addToWhatsAppIntent(pack: Pack): Intent? {
+        if (!pack.ready) {
+            message = tr(
+                "Un paquete necesita entre ${Pack.MIN_STICKERS} y ${Pack.MAX_STICKERS} stickers",
+                "A pack needs ${Pack.MIN_STICKERS} to ${Pack.MAX_STICKERS} stickers",
+            )
+            return null
+        }
+        packStore.ensureTray(pack)
+        val intent = WhatsApp.addIntent(getApplication(), pack)
+        if (intent == null) message = tr("WhatsApp no está instalada", "WhatsApp isn't installed")
+        return intent
+    }
+
+    fun onAddResult(ok: Boolean, validationError: String?) {
+        if (validationError != null) {
+            message = tr("WhatsApp no ha aceptado el paquete: ", "WhatsApp rejected the pack: ") + validationError
+        } else if (ok) {
+            message = tr("¡Paquete añadido a WhatsApp!", "Pack added to WhatsApp!")
+        }
+        refreshAdded()
+    }
+
+    // ---------- Importar desde WhatsApp ----------
+
+    fun openImport() {
+        importOpen = true
+        importSelected = emptySet()
+        importTree?.let { loadImport(it) }
+    }
+
+    fun closeImport() {
+        importOpen = false
+        importFiles = null
+        importSelected = emptySet()
+    }
+
+    fun setImportTree(uri: Uri) {
+        val ctx: Context = getApplication()
+        runCatching {
+            ctx.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        prefs.edit().putString("wa_tree", uri.toString()).apply()
+        importTree = uri
+        loadImport(uri)
+    }
+
+    private fun loadImport(tree: Uri) {
+        importLoading = true
+        viewModelScope.launch {
+            val ctx: Context = getApplication()
+            val files = withContext(Dispatchers.IO) { runCatching { WhatsAppImport.list(ctx, tree) }.getOrNull() }
+            importedOrigins = withContext(Dispatchers.IO) { store.importedOrigins() }
+            importLoading = false
+            if (files == null) {
+                importTree = null
+                prefs.edit().remove("wa_tree").apply()
+                message = tr("No se puede leer esa carpeta. Elígela de nuevo.", "That folder can't be read. Pick it again.")
+            }
+            importFiles = files
+        }
+    }
+
+    fun toggleImport(name: String) {
+        importSelected = if (name in importSelected) importSelected - name else importSelected + name
+    }
+
+    fun selectAllImport(all: Boolean) {
+        importSelected = if (all) (importFiles.orEmpty().map { it.name } - importedOrigins).toSet() else emptySet()
+    }
+
+    fun importSelectedFiles() {
+        val files = importFiles.orEmpty().filter { it.name in importSelected }
+        if (files.isEmpty() || importProgress != null) return
+        viewModelScope.launch {
+            val ctx: Context = getApplication()
+            var ok = 0
+            importProgress = 0 to files.size
+            files.forEachIndexed { i, f ->
+                val done = withContext(Dispatchers.Default) { runCatching { importOne(ctx, f) }.getOrDefault(false) }
+                if (done) ok++
+                importProgress = (i + 1) to files.size
+            }
+            importProgress = null
+            importSelected = emptySet()
+            importedOrigins = withContext(Dispatchers.IO) { store.importedOrigins() }
+            refresh()
+            message = tr("$ok stickers importados", "$ok stickers imported")
+        }
+    }
+
+    private fun importOne(ctx: Context, f: WaFile): Boolean {
+        val bytes = WhatsAppImport.readBytes(ctx, f) ?: return false
+        val animated = WebpInfo.isAnimated(bytes)
+        if (animated) {
+            if (bytes.size > 500 * 1024) return false
+            store.save(bytes, null, Decor().toJson(), meta = StickerMeta(animated = true, origin = f.name))
+            return true
+        }
+        val bmp = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.copy(Bitmap.Config.ARGB_8888, false) ?: return false
+        val base = Images.fitTo512(bmp)
+        val webp = if (WebpInfo.isWebp(bytes) && bmp.width == 512 && bmp.height == 512 && bytes.size <= 100 * 1024) bytes
+        else Images.encodeWebp(base)
+        store.save(webp, Images.encodePng(base), Decor().toJson(), meta = StickerMeta(origin = f.name))
+        return true
     }
 }

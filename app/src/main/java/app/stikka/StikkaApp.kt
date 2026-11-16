@@ -1,16 +1,20 @@
 package app.stikka
 
 import android.app.Application
+import app.stikka.data.PackStore
 import app.stikka.data.StickerStore
 
 class StikkaApp : Application() {
     lateinit var store: StickerStore
+        private set
+    lateinit var packs: PackStore
         private set
 
     override fun onCreate() {
         super.onCreate()
         instance = this
         store = StickerStore(this)
+        packs = PackStore(this, store)
     }
 
     companion object {

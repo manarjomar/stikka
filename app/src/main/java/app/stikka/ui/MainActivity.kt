@@ -31,7 +31,16 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.core.content.FileProvider
 import androidx.core.content.IntentCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import android.content.ActivityNotFoundException
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.unit.dp
+import app.stikka.data.Pack
 import app.stikka.data.Sticker
+import app.stikka.data.WhatsAppImport
 import app.stikka.domain.tr
 import java.io.File
 
@@ -101,6 +110,23 @@ class MainActivity : ComponentActivity() {
         val openGallery = {
             pickPhoto.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
         }
+        val pickFolder = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
+            if (uri != null) vm.setImportTree(uri)
+        }
+        val openFolderPicker = { pickFolder.launch(WhatsAppImport.initialUri()) }
+        val addPack = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { res ->
+            vm.onAddResult(res.resultCode == android.app.Activity.RESULT_OK, res.data?.getStringExtra("validation_error"))
+        }
+        val addToWhatsApp: (Pack) -> Unit = { p ->
+            vm.addToWhatsAppIntent(p)?.let { intent ->
+                try {
+                    addPack.launch(intent)
+                } catch (e: ActivityNotFoundException) {
+                    vm.message = tr("No se ha podido abrir WhatsApp", "Couldn't open WhatsApp")
+                }
+            }
+        }
+        val packs by vm.packs.collectAsStateWithLifecycle()
         val openCamera = {
             val uri = newCameraUri()
             cameraUri = uri
@@ -118,22 +144,39 @@ class MainActivity : ComponentActivity() {
         val viewing = vm.viewing
         val editor = vm.editor
         val decorator = vm.decorator
+        val openPack = vm.openPackId?.let { id -> packs.firstOrNull { it.id == id } }
+        val pickerPack = vm.pickerPackId?.let { id -> packs.firstOrNull { it.id == id } }
         val screen = when {
             decorator != null -> "decor"
             editor != null -> "edit"
             cut != null -> "cut"
             viewing != null -> "view"
+            vm.importOpen -> "import"
+            pickerPack != null -> "picker"
+            openPack != null -> "pack"
             else -> "home"
         }
+        var newPackFor by remember { mutableStateOf<String?>(null) }
 
         BackHandler(enabled = screen != "home") {
             when {
                 decorator != null -> vm.closeDecorator()
                 editor != null -> vm.closeEditor()
                 cut != null -> vm.closeCut()
-                else -> vm.closeViewer()
+                viewing != null -> vm.closeViewer()
+                vm.importOpen -> vm.closeImport()
+                pickerPack != null -> vm.closePicker()
+                else -> vm.closePack()
             }
         }
+
+        // Al volver a la app (por ejemplo, desde WhatsApp) se comprueba qué paquetes están añadidos.
+        androidx.lifecycle.compose.LifecycleResumeEffect(Unit) {
+            vm.refreshAdded()
+            onPauseOrDispose { }
+        }
+
+        Box(Modifier.fillMaxSize()) {
 
         AnimatedContent(
             targetState = screen,
@@ -177,16 +220,46 @@ class MainActivity : ComponentActivity() {
                         onDelete = vm::delete,
                         onEdit = vm::editSticker,
                         onDecorate = vm::decorateSticker,
+                        meta = vm.viewingMeta,
+                        packs = packs,
+                        onEmojis = { vm.setEmojis(sticker, it) },
+                        onAddToPack = { p -> vm.closeViewer(); vm.addToPack(p.id, listOf(sticker.id)) },
+                        onNewPack = { newPackFor = sticker.id },
                     )
                 }
+                "import" -> ImportScreen(vm, onPickFolder = openFolderPicker)
+                "picker" -> pickerPack?.let { PickerScreen(vm, it, stickers) }
+                "pack" -> openPack?.let { PackScreen(vm, it, stickers, onAddToWhatsApp = addToWhatsApp) }
                 else -> HomeScreen(
+                    vm = vm,
                     stickers = stickers,
+                    packs = packs,
                     snackbar = snackbar,
                     onGallery = openGallery,
                     onCamera = openCamera,
-                    onOpen = vm::open,
                 )
             }
+        }
+        if (screen != "home") {
+            SnackbarHost(
+                snackbar,
+                Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = 72.dp),
+            )
+        }
+        }
+
+        newPackFor?.let { id ->
+            PackDialog(
+                title = tr("Nuevo paquete", "New pack"),
+                initialName = "",
+                initialPublisher = vm.lastPublisher,
+                onDismiss = { newPackFor = null },
+                onConfirm = { name, publisher ->
+                    newPackFor = null
+                    vm.closeViewer()
+                    vm.createPack(name, publisher, listOf(id))
+                },
+            )
         }
     }
 }
