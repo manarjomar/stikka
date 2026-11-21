@@ -230,6 +230,9 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         private set
 
     init {
+        if (prefs.getBoolean("multi_pending", false)) {
+            prefs.edit().putBoolean("multi_pending", false).putBoolean("multi_broken", true).apply()
+        }
         viewModelScope.launch {
             withContext(Dispatchers.IO) { fixStaticMarkedAsAnimated() }
             refresh()
@@ -352,14 +355,12 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 cut = CutState.Working(Stage.CUTTING, original)
                 Cutout.ensureModel(getApplication()) { cut = CutState.Working(Stage.DOWNLOADING_MODEL, original) }
                 cut = CutState.Working(Stage.CUTTING, original)
-                val seg = Cutout.segment(original)
-                val mask = Images.confidenceToAlpha(seg.mask)
+                val mask = Images.confidenceToAlpha(Cutout.mask(original))
                 if (StickerMath.coverage(mask) < 0.002f) {
                     cut = CutState.NoSubject(original)
                     return@launch
                 }
-                val subjects = withContext(Dispatchers.Default) { seg.subjects.map { Images.confidenceToAlpha(it) } }
-                cut = build(original, mask, autoCut = true, decor = Decor()).copy(subjects = subjects)
+                cut = build(original, mask, autoCut = true, decor = Decor())
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e
             } catch (e: Throwable) {
@@ -374,6 +375,54 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                     },
                     original,
                 )
+            }
+        }
+    }
+
+    /** Informe del último cierre inesperado (si lo hubo). */
+    var crashReport by mutableStateOf(
+        runCatching { java.io.File(app.filesDir, StikkaApp.CRASH_FILE).takeIf { it.exists() }?.readText() }.getOrNull()
+    )
+        private set
+
+    fun dismissCrash() {
+        runCatching { java.io.File(getApplication<Application>().filesDir, StikkaApp.CRASH_FILE).delete() }
+        crashReport = null
+    }
+
+    var findingSubjects by mutableStateOf(false)
+        private set
+
+    /** El modo «varios sujetos» cerró la app alguna vez en este móvil: se desactiva. */
+    val multiSubjectBroken: Boolean get() = prefs.getBoolean("multi_broken", false)
+
+    /**
+     * Busca personas u objetos por separado (solo cuando el usuario lo pide).
+     * Se deja una marca antes de empezar: si la app se cierra a mitad, al volver se desactiva.
+     */
+    fun findSubjects() {
+        val ready = cut as? CutState.Ready ?: return
+        if (findingSubjects || multiSubjectBroken) return
+        findingSubjects = true
+        prefs.edit().putBoolean("multi_pending", true).commit()
+        job?.cancel()
+        job = viewModelScope.launch {
+            try {
+                val subjects = withContext(Dispatchers.Default) {
+                    Cutout.subjects(ready.original).map { Images.confidenceToAlpha(it) }
+                }
+                if (subjects.size < 2) {
+                    message = tr("Solo he encontrado un sujeto", "I only found one subject")
+                } else {
+                    cut = ready.copy(subjects = subjects, subjectIndex = -1)
+                }
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Throwable) {
+                message = tr("No se han podido separar los sujetos", "Couldn't separate the subjects")
+            } finally {
+                prefs.edit().putBoolean("multi_pending", false).apply()
+                findingSubjects = false
             }
         }
     }

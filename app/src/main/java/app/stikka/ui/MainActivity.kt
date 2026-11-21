@@ -257,6 +257,8 @@ class MainActivity : ComponentActivity() {
                         onEdit = vm::editCut,
                         onDecorate = vm::decorateCut,
                         onSubject = vm::selectSubject,
+                        onFindSubjects = if (vm.multiSubjectBroken) null else vm::findSubjects,
+                        findingSubjects = vm.findingSubjects,
                     )
                 }
                 "view" -> vm.viewing?.let { sticker ->
@@ -305,6 +307,35 @@ class MainActivity : ComponentActivity() {
                 Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = 72.dp),
             )
         }
+        }
+
+        vm.crashReport?.let { report ->
+            androidx.compose.material3.AlertDialog(
+                onDismissRequest = vm::dismissCrash,
+                title = { androidx.compose.material3.Text(tr("Stikka se cerró la última vez", "Stikka closed unexpectedly last time")) },
+                text = {
+                    androidx.compose.material3.Text(
+                        tr(
+                            "Se ha guardado un informe del error. Si lo compartes (por ejemplo, contigo mismo por WhatsApp o correo), se podrá corregir.",
+                            "An error report was saved. If you share it, it can be fixed.",
+                        )
+                    )
+                },
+                confirmButton = {
+                    androidx.compose.material3.TextButton(onClick = {
+                        val send = Intent(Intent.ACTION_SEND).apply {
+                            type = "text/plain"
+                            putExtra(Intent.EXTRA_SUBJECT, "Stikka - informe de error")
+                            putExtra(Intent.EXTRA_TEXT, report)
+                        }
+                        runCatching { startActivity(Intent.createChooser(send, tr("Compartir informe", "Share report"))) }
+                        vm.dismissCrash()
+                    }) { androidx.compose.material3.Text(tr("Compartir informe", "Share report")) }
+                },
+                dismissButton = {
+                    androidx.compose.material3.TextButton(onClick = vm::dismissCrash) { androidx.compose.material3.Text(tr("Cerrar", "Close")) }
+                },
+            )
         }
 
         vm.update?.let { r ->

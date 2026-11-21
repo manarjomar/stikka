@@ -126,8 +126,7 @@ object AnimFrames {
 
     /** Quita el fondo de un fotograma con el recorte inteligente (sin moverlo de sitio). */
     suspend fun removeBackground(frame: Bitmap): Bitmap {
-        val seg = Cutout.segment(frame)
-        val mask = Images.confidenceToAlpha(seg.mask)
+        val mask = Images.confidenceToAlpha(Cutout.mask(frame))
         return Images.applyMask(frame, mask)
     }
 

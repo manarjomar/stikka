@@ -51,6 +51,7 @@ import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -82,6 +83,8 @@ fun CutoutScreen(
     onEdit: () -> Unit,
     onDecorate: () -> Unit,
     onSubject: (Int) -> Unit,
+    onFindSubjects: (() -> Unit)?,
+    findingSubjects: Boolean,
 ) {
     Scaffold(
         topBar = {
@@ -111,7 +114,7 @@ fun CutoutScreen(
             ) { s ->
                 when (s) {
                     is CutState.Working -> WorkingView(s)
-                    is CutState.Ready -> ReadyView(s, saving, onSave, onWholeImage, onEdit, onDecorate, onSubject)
+                    is CutState.Ready -> ReadyView(s, saving, onSave, onWholeImage, onEdit, onDecorate, onSubject, onFindSubjects, findingSubjects)
                     is CutState.NoSubject -> ProblemView(
                         icon = Icons.Rounded.SearchOff,
                         title = tr("No encuentro a nadie", "Nothing to cut out"),
@@ -202,7 +205,7 @@ private fun WorkingView(s: CutState.Working) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun ReadyView(s: CutState.Ready, saving: Boolean, onSave: () -> Unit, onWholeImage: () -> Unit, onEdit: () -> Unit, onDecorate: () -> Unit, onSubject: (Int) -> Unit) {
+private fun ReadyView(s: CutState.Ready, saving: Boolean, onSave: () -> Unit, onWholeImage: () -> Unit, onEdit: () -> Unit, onDecorate: () -> Unit, onSubject: (Int) -> Unit, onFindSubjects: (() -> Unit)?, findingSubjects: Boolean) {
     var showOriginal by remember { mutableStateOf(false) }
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Spacer(Modifier.height(8.dp))
@@ -214,6 +217,16 @@ private fun ReadyView(s: CutState.Ready, saving: Boolean, onSave: () -> Unit, on
                     contentScale = ContentScale.Fit,
                     modifier = Modifier.fillMaxSize().padding(if (orig) 0.dp else 8.dp),
                 )
+            }
+        }
+        if (s.subjects.isEmpty() && s.autoCut && onFindSubjects != null) {
+            Spacer(Modifier.height(10.dp))
+            TextButton(onClick = onFindSubjects, enabled = !findingSubjects && !saving) {
+                if (findingSubjects) {
+                    CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
+                    Spacer(Modifier.width(8.dp))
+                }
+                Text(tr("¿Hay varias personas u objetos? Separarlos", "Several people or objects? Separate them"))
             }
         }
         if (s.subjects.size > 1) {
